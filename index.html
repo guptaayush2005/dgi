@@ -460,7 +460,8 @@
               <h1>Student Directory</h1>
               <p>Manage registered members and contact details.</p>
             </div>
-            <div class="page-actions">
+            <div class="page-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button class="btn btn-secondary btn-sm" onclick="window.app.openStudentCsvImportModal()" style="display:inline-flex;align-items:center;gap:6px;">📁 Import CSV</button>
               <button class="btn btn-secondary btn-sm" onclick="window.db.exportCSV('students')">📥 Export CSV</button>
               <button class="btn btn-primary btn-sm" onclick="window.app.openAddStudentModal()">+ Register Student</button>
             </div>
@@ -496,7 +497,8 @@
               <h1>Faculty Directory</h1>
               <p>Manage faculty profiles and contact details.</p>
             </div>
-            <div class="page-actions">
+            <div class="page-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button class="btn btn-secondary btn-sm" onclick="window.app.openFacultyCsvImportModal()" style="display:inline-flex;align-items:center;gap:6px;">📁 Import CSV</button>
               <button class="btn btn-secondary btn-sm" onclick="window.db.exportCSV('faculty')">📥 Export CSV</button>
               <button class="btn btn-primary btn-sm" onclick="window.app.openAddFacultyModal()">+ Add Faculty</button>
             </div>
@@ -1259,6 +1261,155 @@
       <div class="modal-footer" style="display: flex; justify-content: space-between;">
         <button type="button" class="btn btn-secondary" onclick="window.app.closeModal('modal-csv-import')">Close</button>
         <button type="button" class="btn btn-primary" id="csv-confirm-import-btn" style="display: none;" onclick="window.app.executeCsvImport()">Confirm & Import Books</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Student CSV Import Modal -->
+  <div class="modal-backdrop" id="modal-student-csv-import">
+    <div class="modal-card" style="max-width: 620px;">
+      <div class="modal-header">
+        <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+          <span>📁</span> Import Students from CSV
+        </div>
+        <button class="modal-close-btn" onclick="window.app.closeModal('modal-student-csv-import')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="background: rgba(255, 197, 0, 0.1); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 16px;">
+          <div style="font-weight: 700; color: var(--accent-primary); font-size: 13px; margin-bottom: 4px;">Expected Student CSV Columns:</div>
+          <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+            Supported headers: <strong style="color:var(--text-primary);">Student Name</strong>, <strong style="color:var(--text-primary);">Roll Number</strong>, <strong style="color:var(--text-primary);">Email</strong>, <strong style="color:var(--text-primary);">Department</strong>, and <strong style="color:var(--text-primary);">Contact Phone</strong>. Duplicate Roll Numbers and Email addresses will be detected and skipped automatically.
+          </div>
+          <div style="background: rgba(0,0,0,0.25); border-radius: 4px; padding: 6px 10px; margin-top: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); overflow-x: auto;">
+            Student Name,Roll Number,Department,Email,Contact Phone<br>
+            Aarav Sharma,CS105,CSIT,aarav.csit@dronacharya.info,+91 98765 43215<br>
+            Sneha Patel,CS106,CSIT,sneha.csit@dronacharya.info,+91 98765 43216
+          </div>
+        </div>
+
+        <div id="student-csv-drop-zone" style="border: 2px dashed var(--border-color); border-radius: var(--radius-sm); padding: 24px 16px; text-align: center; cursor: pointer; transition: border-color 0.2s;" onclick="document.getElementById('student-csv-file-input').click()">
+          <div style="font-size: 32px; margin-bottom: 8px;">👨‍🎓</div>
+          <div style="font-weight: 700; font-size: 14px; margin-bottom: 4px;">Click to select or drag and drop Student .csv file</div>
+          <div style="font-size: 12px; color: var(--text-muted);">Accepts .csv files only</div>
+          <input type="file" id="student-csv-file-input" accept=".csv" style="display: none;" onchange="window.app.handleStudentCsvFileSelection(event)">
+        </div>
+
+        <div id="student-csv-preview-section" style="display: none; margin-top: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <strong style="font-size: 13px;">Preview: <span id="student-csv-preview-count" style="color: var(--accent-primary);">0</span> students detected</strong>
+            <span style="font-size: 11px; color: var(--text-muted);">Showing first 5 rows</span>
+          </div>
+          <div style="max-height: 140px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+            <table class="data-table" style="font-size: 12px; margin: 0;">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Roll No</th>
+                  <th>Dept</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                </tr>
+              </thead>
+              <tbody id="student-csv-preview-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="student-csv-import-progress" style="display: none; margin-top: 16px; text-align: center;">
+          <div style="display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; color: var(--accent-primary);">
+            <span>⏳</span> <span>Importing students into library database...</span>
+          </div>
+        </div>
+
+        <div id="student-csv-import-results" style="display: none; margin-top: 16px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-sm); padding: 14px 16px;">
+          <div style="font-weight: 800; font-size: 14px; color: var(--success); margin-bottom: 8px;">Student Import Complete</div>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 12px;">
+            <div>Total records found: <strong id="student-csv-summary-total">0</strong></div>
+            <div>Successfully imported: <strong id="student-csv-summary-imported" style="color: var(--success);">0</strong></div>
+            <div>Duplicates skipped: <strong id="student-csv-summary-duplicates" style="color: var(--text-muted);">0</strong></div>
+            <div>Invalid rows skipped: <strong id="student-csv-summary-invalid" style="color: var(--danger);">0</strong></div>
+          </div>
+          <div id="student-csv-summary-errors-box" style="display: none; margin-top: 10px; font-size: 11px; color: var(--danger); max-height: 80px; overflow-y: auto; background: rgba(0,0,0,0.2); padding: 6px 10px; border-radius: 4px;"></div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: space-between;">
+        <button type="button" class="btn btn-secondary" onclick="window.app.closeModal('modal-student-csv-import')">Close</button>
+        <button type="button" class="btn btn-primary" id="student-csv-confirm-import-btn" style="display: none;" onclick="window.app.executeStudentCsvImport()">Confirm & Import Students</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Faculty CSV Import Modal -->
+  <div class="modal-backdrop" id="modal-faculty-csv-import">
+    <div class="modal-card" style="max-width: 620px;">
+      <div class="modal-header">
+        <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+          <span>📁</span> Import Faculty from CSV
+        </div>
+        <button class="modal-close-btn" onclick="window.app.closeModal('modal-faculty-csv-import')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="background: rgba(255, 197, 0, 0.1); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 16px;">
+          <div style="font-weight: 700; color: var(--accent-primary); font-size: 13px; margin-bottom: 4px;">Expected Faculty CSV Columns:</div>
+          <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+            Supported headers: <strong style="color:var(--text-primary);">Faculty Name</strong>, <strong style="color:var(--text-primary);">Email ID</strong>, <strong style="color:var(--text-primary);">Faculty ID</strong> (or Employee ID), <strong style="color:var(--text-primary);">Designation</strong>, <strong style="color:var(--text-primary);">Department</strong>, and <strong style="color:var(--text-primary);">Phone Number</strong>. Duplicate Employee IDs and Email addresses will be skipped.
+          </div>
+          <div style="background: rgba(0,0,0,0.25); border-radius: 4px; padding: 6px 10px; margin-top: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); overflow-x: auto;">
+            Faculty ID,Faculty Name,Designation,Department,Phone Number,Email ID<br>
+            FAC-101,Dr. Rajesh Verma,Professor,CSIT,+91 98111 22334,rajesh.verma@dronacharya.info<br>
+            FAC-102,Er. Pooja Rawat,Assistant Professor,CSIT,+91 98111 22335,pooja.rawat@dronacharya.info
+          </div>
+        </div>
+
+        <div id="faculty-csv-drop-zone" style="border: 2px dashed var(--border-color); border-radius: var(--radius-sm); padding: 24px 16px; text-align: center; cursor: pointer; transition: border-color 0.2s;" onclick="document.getElementById('faculty-csv-file-input').click()">
+          <div style="font-size: 32px; margin-bottom: 8px;">👩‍🏫</div>
+          <div style="font-weight: 700; font-size: 14px; margin-bottom: 4px;">Click to select or drag and drop Faculty .csv file</div>
+          <div style="font-size: 12px; color: var(--text-muted);">Accepts .csv files only</div>
+          <input type="file" id="faculty-csv-file-input" accept=".csv" style="display: none;" onchange="window.app.handleFacultyCsvFileSelection(event)">
+        </div>
+
+        <div id="faculty-csv-preview-section" style="display: none; margin-top: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <strong style="font-size: 13px;">Preview: <span id="faculty-csv-preview-count" style="color: var(--accent-primary);">0</span> faculty members detected</strong>
+            <span style="font-size: 11px; color: var(--text-muted);">Showing first 5 rows</span>
+          </div>
+          <div style="max-height: 140px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+            <table class="data-table" style="font-size: 12px; margin: 0;">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Name</th>
+                  <th>Designation</th>
+                  <th>Dept</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                </tr>
+              </thead>
+              <tbody id="faculty-csv-preview-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="faculty-csv-import-progress" style="display: none; margin-top: 16px; text-align: center;">
+          <div style="display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; color: var(--accent-primary);">
+            <span>⏳</span> <span>Importing faculty into library database...</span>
+          </div>
+        </div>
+
+        <div id="faculty-csv-import-results" style="display: none; margin-top: 16px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-sm); padding: 14px 16px;">
+          <div style="font-weight: 800; font-size: 14px; color: var(--success); margin-bottom: 8px;">Faculty Import Complete</div>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 12px;">
+            <div>Total records found: <strong id="faculty-summary-total">0</strong></div>
+            <div>Successfully imported: <strong id="faculty-summary-imported" style="color: var(--success);">0</strong></div>
+            <div>Duplicates skipped: <strong id="faculty-summary-duplicates" style="color: var(--text-muted);">0</strong></div>
+            <div>Invalid rows skipped: <strong id="faculty-summary-invalid" style="color: var(--danger);">0</strong></div>
+          </div>
+          <div id="faculty-summary-errors-box" style="display: none; margin-top: 10px; font-size: 11px; color: var(--danger); max-height: 80px; overflow-y: auto; background: rgba(0,0,0,0.2); padding: 6px 10px; border-radius: 4px;"></div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: space-between;">
+        <button type="button" class="btn btn-secondary" onclick="window.app.closeModal('modal-faculty-csv-import')">Close</button>
+        <button type="button" class="btn btn-primary" id="faculty-csv-confirm-import-btn" style="display: none;" onclick="window.app.executeFacultyCsvImport()">Confirm & Import Faculty</button>
       </div>
     </div>
   </div>

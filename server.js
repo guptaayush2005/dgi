@@ -826,6 +826,213 @@ async function handleRequest(req, res) {
       });
     }
 
+    // ==================== ADMIN STUDENTS CSV IMPORT ========================
+    if (p === '/api/admin/students/import-csv' && method === 'POST') {
+      const account = requireAdmin(req, res);
+      if (!account) return;
+      const b = await readBody(req);
+      const csvText = String(b.csv || '').trim();
+      if (!csvText) return send(res, 400, { error: 'CSV content is required.' });
+
+      const rows = parseCSV(csvText);
+      if (!rows || rows.length < 2) {
+        return send(res, 400, { error: 'The CSV file is empty or missing data rows.' });
+      }
+
+      const headers = rows[0].map(h => String(h || '').trim().toLowerCase());
+      const nameIdx = headers.findIndex(h => ['student name', 'name', 'full name', 'student', 'student_name'].includes(h));
+      const rollIdx = headers.findIndex(h => ['roll number', 'roll no', 'roll_no', 'rollno', 'roll', 'admission no'].includes(h));
+      const emailIdx = headers.findIndex(h => ['email', 'email address', 'email id', 'email_id', 'student email'].includes(h));
+      const deptIdx = headers.findIndex(h => ['department', 'dept', 'branch', 'course', 'stream'].includes(h));
+      const phoneIdx = headers.findIndex(h => ['contact phone', 'phone', 'phone number', 'phone_number', 'mobile', 'contact', 'contact no'].includes(h));
+
+      if (nameIdx === -1 || rollIdx === -1) {
+        const missing = [];
+        if (nameIdx === -1) missing.push('Student Name');
+        if (rollIdx === -1) missing.push('Roll Number');
+        return send(res, 400, {
+          error: `Missing required column headers: ${missing.join(', ')}. Supported headers: Student Name, Roll Number, Email, Department, Contact Phone.`
+        });
+      }
+
+      const entry = accountState(account.key);
+      const state = entry.state || (entry.state = defaultLibraryState());
+      state.students = Array.isArray(state.students) ? state.students : [];
+
+      let nextId = state.students.reduce((max, s) => Math.max(max, Number(s.id) || 0), 0) + 1;
+      let totalFound = 0;
+      let importedCount = 0;
+      let duplicateCount = 0;
+      let invalidCount = 0;
+      const errors = [];
+      const importedStudents = [];
+
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.every(col => !col || !String(col).trim())) continue;
+        totalFound++;
+
+        const name = String(row[nameIdx] || '').trim();
+        const roll = String(row[rollIdx] || '').trim().toUpperCase();
+        const email = emailIdx !== -1 ? String(row[emailIdx] || '').trim().toLowerCase() : '';
+        const dept = deptIdx !== -1 ? String(row[deptIdx] || '').trim() : 'CSIT';
+        const phone = phoneIdx !== -1 ? String(row[phoneIdx] || '').trim() : '+91';
+
+        if (!name || !roll) {
+          invalidCount++;
+          errors.push(`Row ${i + 1}: Missing student Name or Roll Number.`);
+          continue;
+        }
+
+        // Duplicate check: roll number or email
+        const isDup = state.students.some(s =>
+          String(s.roll_no || '').trim().toUpperCase() === roll ||
+          (email && String(s.email || '').trim().toLowerCase() === email)
+        ) || importedStudents.some(s =>
+          s.roll_no.toUpperCase() === roll ||
+          (email && s.email.toLowerCase() === email)
+        );
+
+        if (isDup) {
+          duplicateCount++;
+          continue;
+        }
+
+        const initials = name.split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'ST';
+        const newStudent = {
+          id: nextId++,
+          name,
+          roll_no: roll,
+          email: email || `${roll.toLowerCase()}@dronacharya.info`,
+          department: dept || 'CSIT',
+          phone: phone || '+91',
+          avatar: initials,
+          created_at: new Date().toISOString()
+        };
+
+        state.students.push(newStudent);
+        importedStudents.push(newStudent);
+        importedCount++;
+      }
+
+      entry.revision += 1;
+      await saveStore();
+
+      return send(res, 200, {
+        success: true,
+        totalFound,
+        importedCount,
+        duplicateCount,
+        invalidCount,
+        errors,
+        students: state.students
+      });
+    }
+
+    // ==================== ADMIN FACULTY CSV IMPORT =========================
+    if (p === '/api/admin/faculty/import-csv' && method === 'POST') {
+      const account = requireAdmin(req, res);
+      if (!account) return;
+      const b = await readBody(req);
+      const csvText = String(b.csv || '').trim();
+      if (!csvText) return send(res, 400, { error: 'CSV content is required.' });
+
+      const rows = parseCSV(csvText);
+      if (!rows || rows.length < 2) {
+        return send(res, 400, { error: 'The CSV file is empty or missing data rows.' });
+      }
+
+      const headers = rows[0].map(h => String(h || '').trim().toLowerCase());
+      const nameIdx = headers.findIndex(h => ['faculty name', 'name', 'full name', 'professor', 'faculty_name'].includes(h));
+      const idIdx = headers.findIndex(h => ['faculty id', 'employee id', 'emp id', 'empid', 'id', 'faculty_id'].includes(h));
+      const desigIdx = headers.findIndex(h => ['designation', 'post', 'role', 'title'].includes(h));
+      const deptIdx = headers.findIndex(h => ['department', 'dept', 'branch'].includes(h));
+      const phoneIdx = headers.findIndex(h => ['phone number', 'phone', 'contact number', 'mobile', 'contact'].includes(h));
+      const emailIdx = headers.findIndex(h => ['email id', 'email', 'email address', 'faculty email'].includes(h));
+
+      if (nameIdx === -1 || emailIdx === -1) {
+        const missing = [];
+        if (nameIdx === -1) missing.push('Faculty Name');
+        if (emailIdx === -1) missing.push('Email');
+        return send(res, 400, {
+          error: `Missing required column headers: ${missing.join(', ')}. Supported headers: Faculty Name, Email, Employee ID, Department, Contact Number, Designation.`
+        });
+      }
+
+      const entry = accountState(account.key);
+      const state = entry.state || (entry.state = defaultLibraryState());
+      state.faculty = Array.isArray(state.faculty) ? state.faculty : [];
+
+      let nextId = state.faculty.reduce((max, f) => Math.max(max, Number(f.id) || 0), 0) + 1;
+      let totalFound = 0;
+      let importedCount = 0;
+      let duplicateCount = 0;
+      let invalidCount = 0;
+      const errors = [];
+      const importedFaculty = [];
+
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.every(col => !col || !String(col).trim())) continue;
+        totalFound++;
+
+        const name = String(row[nameIdx] || '').trim();
+        const email = String(row[emailIdx] || '').trim().toLowerCase();
+        const facultyId = idIdx !== -1 ? String(row[idIdx] || '').trim() : '';
+        const desig = desigIdx !== -1 ? String(row[desigIdx] || '').trim() : 'Assistant Professor';
+        const dept = deptIdx !== -1 ? String(row[deptIdx] || '').trim() : 'CSIT';
+        const phone = phoneIdx !== -1 ? String(row[phoneIdx] || '').trim() : '';
+
+        if (!name || !email) {
+          invalidCount++;
+          errors.push(`Row ${i + 1}: Missing faculty Name or Email.`);
+          continue;
+        }
+
+        // Duplicate check: faculty_id or email
+        const isDup = state.faculty.some(f =>
+          (facultyId && String(f.faculty_id || '').trim().toLowerCase() === facultyId.toLowerCase()) ||
+          String(f.email || '').trim().toLowerCase() === email
+        ) || importedFaculty.some(f =>
+          (facultyId && f.faculty_id.toLowerCase() === facultyId.toLowerCase()) ||
+          f.email.toLowerCase() === email
+        );
+
+        if (isDup) {
+          duplicateCount++;
+          continue;
+        }
+
+        const newFaculty = {
+          id: nextId++,
+          faculty_id: facultyId || `FAC-${nextId}`,
+          name,
+          designation: desig || 'Assistant Professor',
+          department: dept || 'CSIT',
+          phone: phone || '',
+          email,
+          created_at: new Date().toISOString()
+        };
+
+        state.faculty.push(newFaculty);
+        importedFaculty.push(newFaculty);
+        importedCount++;
+      }
+
+      entry.revision += 1;
+      await saveStore();
+
+      return send(res, 200, {
+        success: true,
+        totalFound,
+        importedCount,
+        duplicateCount,
+        invalidCount,
+        errors,
+        faculty: state.faculty
+      });
+    }
+
     if (p === '/api/admin/books/metadata' && method === 'GET') {
       const account = requireAdmin(req, res);
       if (!account) return;

@@ -49,6 +49,10 @@ class DGIApp {
     })[character]);
   }
 
+  escapeHtml(value) {
+    return this.escapeHTML(value);
+  }
+
   safeBookColor(value) {
     const color = String(value || "");
     return /^#[\da-f]{3,8}$/i.test(color) && [4, 5, 7, 9].includes(color.length)
@@ -3179,6 +3183,63 @@ class DGIApp {
     }
   }
 
+  // --- Shared CSV Parser Utility ---
+  parseCsvString(str) {
+    const rows = [];
+    let currentRow = [];
+    let currentVal = "";
+    let inQuotes = false;
+    let i = 0;
+    const s = String(str || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    while (i < s.length) {
+      const char = s[i];
+      if (inQuotes) {
+        if (char === '"') {
+          if (i + 1 < s.length && s[i + 1] === '"') {
+            currentVal += '"';
+            i += 2;
+            continue;
+          } else {
+            inQuotes = false;
+            i++;
+            continue;
+          }
+        } else {
+          currentVal += char;
+          i++;
+          continue;
+        }
+      } else {
+        if (char === '"') {
+          inQuotes = true;
+          i++;
+          continue;
+        } else if (char === ",") {
+          currentRow.push(currentVal);
+          currentVal = "";
+          i++;
+          continue;
+        } else if (char === "\n") {
+          currentRow.push(currentVal);
+          currentVal = "";
+          if (currentRow.some(val => val.trim().length > 0)) rows.push(currentRow);
+          currentRow = [];
+          i++;
+          continue;
+        } else {
+          currentVal += char;
+          i++;
+          continue;
+        }
+      }
+    }
+    if (currentVal || currentRow.length > 0) {
+      currentRow.push(currentVal);
+      if (currentRow.some(val => val.trim().length > 0)) rows.push(currentRow);
+    }
+    return rows;
+  }
+
   // --- CSV Import (3 Columns: Name, Author, Category) ---
   openCsvImportModal() {
     this._pendingCsvText = null;
@@ -3222,63 +3283,7 @@ class DGIApp {
   }
 
   _parseAndPreviewCsv(text) {
-    const parseCSV = (str) => {
-      const rows = [];
-      let currentRow = [];
-      let currentVal = "";
-      let inQuotes = false;
-      let i = 0;
-      const s = String(str || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-      while (i < s.length) {
-        const char = s[i];
-        if (inQuotes) {
-          if (char === '"') {
-            if (i + 1 < s.length && s[i + 1] === '"') {
-              currentVal += '"';
-              i += 2;
-              continue;
-            } else {
-              inQuotes = false;
-              i++;
-              continue;
-            }
-          } else {
-            currentVal += char;
-            i++;
-            continue;
-          }
-        } else {
-          if (char === '"') {
-            inQuotes = true;
-            i++;
-            continue;
-          } else if (char === ",") {
-            currentRow.push(currentVal);
-            currentVal = "";
-            i++;
-            continue;
-          } else if (char === "\n") {
-            currentRow.push(currentVal);
-            currentVal = "";
-            if (currentRow.some(val => val.trim().length > 0)) rows.push(currentRow);
-            currentRow = [];
-            i++;
-            continue;
-          } else {
-            currentVal += char;
-            i++;
-            continue;
-          }
-        }
-      }
-      if (currentVal || currentRow.length > 0) {
-        currentRow.push(currentVal);
-        if (currentRow.some(val => val.trim().length > 0)) rows.push(currentRow);
-      }
-      return rows;
-    };
-
-    const rows = parseCSV(text);
+    const rows = this.parseCsvString(text);
     if (!rows || rows.length < 2) {
       this.showToast("Empty CSV", "The CSV file contains no data rows.", "warning");
       return;
@@ -3305,9 +3310,9 @@ class DGIApp {
       previewRows.forEach(r => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td><strong>${this.escapeHtml(String(r[nameIdx] || ""))}</strong></td>
-          <td>${this.escapeHtml(String(r[authorIdx] || ""))}</td>
-          <td><span class="badge badge-primary">${this.escapeHtml(String(r[categoryIdx] || ""))}</span></td>
+          <td><strong>${this.escapeHTML(String(r[nameIdx] || ""))}</strong></td>
+          <td>${this.escapeHTML(String(r[authorIdx] || ""))}</td>
+          <td><span class="badge badge-primary">${this.escapeHTML(String(r[categoryIdx] || ""))}</span></td>
         `;
         previewTbody.appendChild(tr);
       });
@@ -3337,16 +3342,116 @@ class DGIApp {
     if (results) results.style.display = "none";
 
     try {
-      const response = await fetch("/api/admin/books/import-csv", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ csv: this._pendingCsvText })
-      });
+      const isOnline = ['http:', 'https:'].includes(window.location.protocol);
+      let res = null;
 
-      const res = await response.json();
-      if (!response.ok) {
-        throw new Error(res.error || `Server error (${response.status})`);
+      if (isOnline) {
+        try {
+          const response = await fetch("/api/admin/books/import-csv", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ csv: this._pendingCsvText })
+          });
+          const json = await response.json();
+          if (response.ok) {
+            res = json;
+          } else {
+            throw new Error(json.error || `Server error (${response.status})`);
+          }
+        } catch (fetchErr) {
+          if (fetchErr.message && !fetchErr.message.toLowerCase().includes("failed to fetch")) {
+            throw fetchErr;
+          }
+        }
+      }
+
+      // Offline / file:// fallback
+      if (!res) {
+        const rows = this.parseCsvString(this._pendingCsvText);
+        if (!rows || rows.length < 2) throw new Error("The CSV file contains no data rows.");
+
+        const headers = rows[0].map(h => String(h || "").trim().toLowerCase());
+        const nameIdx = headers.findIndex(h => ["name", "title", "book_name", "book title", "book"].includes(h));
+        const authorIdx = headers.findIndex(h => ["author", "authors", "writer", "book_author"].includes(h));
+        const categoryIdx = headers.findIndex(h => ["category", "genre", "department", "subject", "branch"].includes(h));
+
+        if (nameIdx === -1 || authorIdx === -1 || categoryIdx === -1) {
+          throw new Error("Missing required columns: Name, Author, and Category.");
+        }
+
+        const data = window.db._getData();
+        data.books = Array.isArray(data.books) ? data.books : [];
+        let nextId = data.books.reduce((max, b) => Math.max(max, Number(b.id) || 0), 0) + 1;
+        let totalFound = 0;
+        let importedCount = 0;
+        let duplicateCount = 0;
+        let invalidCount = 0;
+        const errors = [];
+        const importedBooks = [];
+
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || row.every(col => !col || !String(col).trim())) continue;
+          totalFound++;
+
+          const name = String(row[nameIdx] || "").trim();
+          const author = String(row[authorIdx] || "").trim();
+          const category = String(row[categoryIdx] || "").trim();
+
+          if (!name || !author || !category) {
+            invalidCount++;
+            errors.push(`Row ${i + 1}: Missing Name, Author, or Category.`);
+            continue;
+          }
+
+          const isDup = data.books.some(bk =>
+            String(bk.title || "").trim().toLowerCase() === name.toLowerCase() &&
+            String(bk.author || "").trim().toLowerCase() === author.toLowerCase()
+          ) || importedBooks.some(bk =>
+            bk.title.toLowerCase() === name.toLowerCase() &&
+            bk.author.toLowerCase() === author.toLowerCase()
+          );
+
+          if (isDup) {
+            duplicateCount++;
+            continue;
+          }
+
+          const newBook = {
+            id: nextId++,
+            title: name,
+            author: author || '',
+            category: category || 'General',
+            isbn: '',
+            publisher: '',
+            description: '',
+            shelf_location: '',
+            quantity: 1,
+            available: 1,
+            borrow_count: 0,
+            color1: '#510027',
+            color2: '#3d001e',
+            rating: 4.5,
+            published_year: null,
+            created_at: new Date().toISOString()
+          };
+
+          data.books.push(newBook);
+          importedBooks.push(newBook);
+          importedCount++;
+        }
+
+        window.db._saveData(data);
+        res = {
+          success: true,
+          totalFound,
+          importedCount,
+          duplicateCount,
+          invalidCount,
+          errors,
+          books: data.books
+        };
       }
 
       if (progress) progress.style.display = "none";
@@ -3372,12 +3477,522 @@ class DGIApp {
         const data = window.db._getData();
         data.books = res.books;
         window.db._saveData(data);
-        this.renderBooks();
-        this.renderDashboard();
-        if (typeof this.updateCategoryPills === "function") this.updateCategoryPills();
       }
+      this.renderBooks();
+      this.renderDashboard();
+      if (typeof this.updateCategoryPills === "function") this.updateCategoryPills();
 
       this.showToast("Import Successful", `${res.importedCount} new book(s) imported into catalog.`, "success");
+    } catch (err) {
+      if (progress) progress.style.display = "none";
+      if (confirmBtn) confirmBtn.disabled = false;
+      this.showToast("Import Failed", err.message, "danger");
+    }
+  }
+
+  // --- Student CSV Import ---
+  openStudentCsvImportModal() {
+    this._pendingStudentCsvText = null;
+    this._parsedStudentCsvRows = null;
+    const fileInput = document.getElementById("student-csv-file-input");
+    if (fileInput) fileInput.value = "";
+    const previewSection = document.getElementById("student-csv-preview-section");
+    if (previewSection) previewSection.style.display = "none";
+    const progress = document.getElementById("student-csv-import-progress");
+    if (progress) progress.style.display = "none";
+    const results = document.getElementById("student-csv-import-results");
+    if (results) results.style.display = "none";
+    const confirmBtn = document.getElementById("student-csv-confirm-import-btn");
+    if (confirmBtn) {
+      confirmBtn.style.display = "none";
+      confirmBtn.disabled = false;
+    }
+    this.openModal("modal-student-csv-import");
+  }
+
+  handleStudentCsvFileSelection(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      this.showToast("Invalid File Type", "Please select a valid .csv file.", "warning");
+      event.target.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target.result;
+      this._pendingStudentCsvText = text;
+      this._parseAndPreviewStudentCsv(text);
+    };
+    reader.onerror = () => {
+      this.showToast("File Read Error", "Could not read the selected student CSV file.", "danger");
+    };
+    reader.readAsText(file);
+  }
+
+  _parseAndPreviewStudentCsv(text) {
+    const rows = this.parseCsvString(text);
+    if (!rows || rows.length < 2) {
+      this.showToast("Empty CSV", "The CSV file contains no data rows.", "warning");
+      return;
+    }
+
+    const headers = rows[0].map(h => String(h || "").trim().toLowerCase());
+    const nameIdx = headers.findIndex(h => ["student name", "name", "full name", "student", "student_name"].includes(h));
+    const rollIdx = headers.findIndex(h => ["roll number", "roll no", "roll_no", "rollno", "roll", "admission no"].includes(h));
+    const emailIdx = headers.findIndex(h => ["email", "email address", "email id", "email_id", "student email"].includes(h));
+    const deptIdx = headers.findIndex(h => ["department", "dept", "branch", "course", "stream"].includes(h));
+    const phoneIdx = headers.findIndex(h => ["contact phone", "phone", "phone number", "phone_number", "mobile", "contact", "contact no"].includes(h));
+
+    if (nameIdx === -1 || rollIdx === -1) {
+      const missing = [];
+      if (nameIdx === -1) missing.push("Student Name");
+      if (rollIdx === -1) missing.push("Roll Number");
+      this.showToast("Invalid CSV Headers", `Missing required columns: ${missing.join(", ")}. Supported headers: Student Name, Roll Number, Email, Department, Contact Phone.`, "danger");
+      return;
+    }
+
+    const previewTbody = document.getElementById("student-csv-preview-tbody");
+    if (previewTbody) {
+      previewTbody.innerHTML = "";
+      const previewRows = rows.slice(1, 6);
+      previewRows.forEach(r => {
+        const tr = document.createElement("tr");
+        const dept = deptIdx !== -1 && r[deptIdx] ? String(r[deptIdx]).trim() : "CSIT";
+        const email = emailIdx !== -1 && r[emailIdx] ? String(r[emailIdx]).trim() : "—";
+        const phone = phoneIdx !== -1 && r[phoneIdx] ? String(r[phoneIdx]).trim() : "+91";
+        tr.innerHTML = `
+          <td><strong>${this.escapeHTML(String(r[nameIdx] || "").trim())}</strong></td>
+          <td><span class="isbn-code">${this.escapeHTML(String(r[rollIdx] || "").trim().toUpperCase())}</span></td>
+          <td><span class="badge badge-accent">${this.escapeHTML(dept)}</span></td>
+          <td>${this.escapeHTML(email)}</td>
+          <td>${this.escapeHTML(phone)}</td>
+        `;
+        previewTbody.appendChild(tr);
+      });
+    }
+
+    const countElem = document.getElementById("student-csv-preview-count");
+    if (countElem) countElem.textContent = String(rows.length - 1);
+
+    const previewSection = document.getElementById("student-csv-preview-section");
+    if (previewSection) previewSection.style.display = "block";
+    const confirmBtn = document.getElementById("student-csv-confirm-import-btn");
+    if (confirmBtn) confirmBtn.style.display = "inline-block";
+  }
+
+  async executeStudentCsvImport() {
+    if (!this._pendingStudentCsvText) {
+      this.showToast("No File Selected", "Please select a .csv file first.", "warning");
+      return;
+    }
+
+    const progress = document.getElementById("student-csv-import-progress");
+    const confirmBtn = document.getElementById("student-csv-confirm-import-btn");
+    const results = document.getElementById("student-csv-import-results");
+
+    if (progress) progress.style.display = "block";
+    if (confirmBtn) confirmBtn.disabled = true;
+    if (results) results.style.display = "none";
+
+    try {
+      const isOnline = ['http:', 'https:'].includes(window.location.protocol);
+      let res = null;
+
+      if (isOnline) {
+        try {
+          const response = await fetch("/api/admin/students/import-csv", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ csv: this._pendingStudentCsvText })
+          });
+          const json = await response.json();
+          if (response.ok) {
+            res = json;
+          } else {
+            throw new Error(json.error || `Server error (${response.status})`);
+          }
+        } catch (fetchErr) {
+          if (fetchErr.message && !fetchErr.message.toLowerCase().includes("failed to fetch")) {
+            throw fetchErr;
+          }
+        }
+      }
+
+      // Offline / file:// fallback
+      if (!res) {
+        const rows = this.parseCsvString(this._pendingStudentCsvText);
+        if (!rows || rows.length < 2) {
+          throw new Error("The CSV file contains no data rows.");
+        }
+        const headers = rows[0].map(h => String(h || "").trim().toLowerCase());
+        const nameIdx = headers.findIndex(h => ["student name", "name", "full name", "student", "student_name"].includes(h));
+        const rollIdx = headers.findIndex(h => ["roll number", "roll no", "roll_no", "rollno", "roll", "admission no"].includes(h));
+        const emailIdx = headers.findIndex(h => ["email", "email address", "email id", "email_id", "student email"].includes(h));
+        const deptIdx = headers.findIndex(h => ["department", "dept", "branch", "course", "stream"].includes(h));
+        const phoneIdx = headers.findIndex(h => ["contact phone", "phone", "phone number", "phone_number", "mobile", "contact", "contact no"].includes(h));
+
+        if (nameIdx === -1 || rollIdx === -1) {
+          throw new Error("Missing required columns: Student Name and Roll Number.");
+        }
+
+        const data = window.db._getData();
+        data.students = Array.isArray(data.students) ? data.students : [];
+        let nextId = data.students.reduce((max, s) => Math.max(max, Number(s.id) || 0), 0) + 1;
+        let totalFound = 0;
+        let importedCount = 0;
+        let duplicateCount = 0;
+        let invalidCount = 0;
+        const errors = [];
+        const importedStudents = [];
+
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || row.every(col => !col || !String(col).trim())) continue;
+          totalFound++;
+
+          const name = String(row[nameIdx] || "").trim();
+          const roll = String(row[rollIdx] || "").trim().toUpperCase();
+          const email = emailIdx !== -1 ? String(row[emailIdx] || "").trim().toLowerCase() : "";
+          const dept = deptIdx !== -1 ? String(row[deptIdx] || "").trim() : "CSIT";
+          const phone = phoneIdx !== -1 ? String(row[phoneIdx] || "").trim() : "+91";
+
+          if (!name || !roll) {
+            invalidCount++;
+            errors.push(`Row ${i + 1}: Missing student Name or Roll Number.`);
+            continue;
+          }
+
+          const isDup = data.students.some(s =>
+            String(s.roll_no || "").trim().toUpperCase() === roll ||
+            (email && String(s.email || "").trim().toLowerCase() === email)
+          ) || importedStudents.some(s =>
+            s.roll_no.toUpperCase() === roll ||
+            (email && s.email.toLowerCase() === email)
+          );
+
+          if (isDup) {
+            duplicateCount++;
+            continue;
+          }
+
+          const initials = name.split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase() || "ST";
+          const newStudent = {
+            id: nextId++,
+            name,
+            roll_no: roll,
+            email: email || `${roll.toLowerCase()}@dronacharya.info`,
+            department: dept || "CSIT",
+            phone: phone || "+91",
+            avatar: initials,
+            created_at: new Date().toISOString()
+          };
+
+          data.students.push(newStudent);
+          importedStudents.push(newStudent);
+          importedCount++;
+        }
+
+        window.db._saveData(data);
+        res = {
+          success: true,
+          totalFound,
+          importedCount,
+          duplicateCount,
+          invalidCount,
+          errors,
+          students: data.students
+        };
+      }
+
+      if (progress) progress.style.display = "none";
+      if (results) results.style.display = "block";
+      if (confirmBtn) confirmBtn.style.display = "none";
+
+      document.getElementById("student-csv-summary-total").textContent = res.totalFound;
+      document.getElementById("student-csv-summary-imported").textContent = res.importedCount;
+      document.getElementById("student-csv-summary-duplicates").textContent = res.duplicateCount;
+      document.getElementById("student-csv-summary-invalid").textContent = res.invalidCount;
+
+      const errorBox = document.getElementById("student-csv-summary-errors-box");
+      if (errorBox) {
+        if (res.errors && res.errors.length > 0) {
+          errorBox.innerHTML = `<strong>Validation Issues:</strong><br>${res.errors.join("<br>")}`;
+          errorBox.style.display = "block";
+        } else {
+          errorBox.style.display = "none";
+        }
+      }
+
+      if (Array.isArray(res.students)) {
+        const data = window.db._getData();
+        data.students = res.students;
+        window.db._saveData(data);
+      }
+      this.renderStudents();
+      this.renderDashboard();
+
+      this.showToast("Import Successful", `${res.importedCount} student(s) imported into directory.`, "success");
+    } catch (err) {
+      if (progress) progress.style.display = "none";
+      if (confirmBtn) confirmBtn.disabled = false;
+      this.showToast("Import Failed", err.message, "danger");
+    }
+  }
+
+  // --- Faculty CSV Import ---
+  openFacultyCsvImportModal() {
+    this._pendingFacultyCsvText = null;
+    this._parsedFacultyCsvRows = null;
+    const fileInput = document.getElementById("faculty-csv-file-input");
+    if (fileInput) fileInput.value = "";
+    const previewSection = document.getElementById("faculty-csv-preview-section");
+    if (previewSection) previewSection.style.display = "none";
+    const progress = document.getElementById("faculty-csv-import-progress");
+    if (progress) progress.style.display = "none";
+    const results = document.getElementById("faculty-csv-import-results");
+    if (results) results.style.display = "none";
+    const confirmBtn = document.getElementById("faculty-csv-confirm-import-btn");
+    if (confirmBtn) {
+      confirmBtn.style.display = "none";
+      confirmBtn.disabled = false;
+    }
+    this.openModal("modal-faculty-csv-import");
+  }
+
+  handleFacultyCsvFileSelection(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      this.showToast("Invalid File Type", "Please select a valid .csv file.", "warning");
+      event.target.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target.result;
+      this._pendingFacultyCsvText = text;
+      this._parseAndPreviewFacultyCsv(text);
+    };
+    reader.onerror = () => {
+      this.showToast("File Read Error", "Could not read the selected faculty CSV file.", "danger");
+    };
+    reader.readAsText(file);
+  }
+
+  _parseAndPreviewFacultyCsv(text) {
+    const rows = this.parseCsvString(text);
+    if (!rows || rows.length < 2) {
+      this.showToast("Empty CSV", "The CSV file contains no data rows.", "warning");
+      return;
+    }
+
+    const headers = rows[0].map(h => String(h || "").trim().toLowerCase());
+    const nameIdx = headers.findIndex(h => ["faculty name", "name", "full name", "professor", "faculty_name"].includes(h));
+    const idIdx = headers.findIndex(h => ["faculty id", "employee id", "emp id", "empid", "id", "faculty_id"].includes(h));
+    const desigIdx = headers.findIndex(h => ["designation", "post", "role", "title"].includes(h));
+    const deptIdx = headers.findIndex(h => ["department", "dept", "branch"].includes(h));
+    const phoneIdx = headers.findIndex(h => ["phone number", "phone", "contact number", "mobile", "contact"].includes(h));
+    const emailIdx = headers.findIndex(h => ["email id", "email", "email address", "faculty email"].includes(h));
+
+    if (nameIdx === -1 || emailIdx === -1) {
+      const missing = [];
+      if (nameIdx === -1) missing.push("Faculty Name");
+      if (emailIdx === -1) missing.push("Email");
+      this.showToast("Invalid CSV Headers", `Missing required columns: ${missing.join(", ")}. Supported headers: Faculty Name, Email, Employee ID, Department, Contact Number, Designation.`, "danger");
+      return;
+    }
+
+    const previewTbody = document.getElementById("faculty-csv-preview-tbody");
+    if (previewTbody) {
+      previewTbody.innerHTML = "";
+      const previewRows = rows.slice(1, 6);
+      previewRows.forEach(r => {
+        const tr = document.createElement("tr");
+        const facId = idIdx !== -1 && r[idIdx] ? String(r[idIdx]).trim() : "Auto";
+        const desig = desigIdx !== -1 && r[desigIdx] ? String(r[desigIdx]).trim() : "Assistant Professor";
+        const dept = deptIdx !== -1 && r[deptIdx] ? String(r[deptIdx]).trim() : "CSIT";
+        const phone = phoneIdx !== -1 && r[phoneIdx] ? String(r[phoneIdx]).trim() : "—";
+        tr.innerHTML = `
+          <td><span class="isbn-code">${this.escapeHTML(facId)}</span></td>
+          <td><strong>${this.escapeHTML(String(r[nameIdx] || "").trim())}</strong></td>
+          <td>${this.escapeHTML(desig)}</td>
+          <td><span class="badge badge-accent">${this.escapeHTML(dept)}</span></td>
+          <td>${this.escapeHTML(String(r[emailIdx] || "").trim())}</td>
+          <td>${this.escapeHTML(phone)}</td>
+        `;
+        previewTbody.appendChild(tr);
+      });
+    }
+
+    const countElem = document.getElementById("faculty-csv-preview-count");
+    if (countElem) countElem.textContent = String(rows.length - 1);
+
+    const previewSection = document.getElementById("faculty-csv-preview-section");
+    if (previewSection) previewSection.style.display = "block";
+    const confirmBtn = document.getElementById("faculty-csv-confirm-import-btn");
+    if (confirmBtn) confirmBtn.style.display = "inline-block";
+  }
+
+  async executeFacultyCsvImport() {
+    if (!this._pendingFacultyCsvText) {
+      this.showToast("No File Selected", "Please select a .csv file first.", "warning");
+      return;
+    }
+
+    const progress = document.getElementById("faculty-csv-import-progress");
+    const confirmBtn = document.getElementById("faculty-csv-confirm-import-btn");
+    const results = document.getElementById("faculty-csv-import-results");
+
+    if (progress) progress.style.display = "block";
+    if (confirmBtn) confirmBtn.disabled = true;
+    if (results) results.style.display = "none";
+
+    try {
+      const isOnline = ['http:', 'https:'].includes(window.location.protocol);
+      let res = null;
+
+      if (isOnline) {
+        try {
+          const response = await fetch("/api/admin/faculty/import-csv", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ csv: this._pendingFacultyCsvText })
+          });
+          const json = await response.json();
+          if (response.ok) {
+            res = json;
+          } else {
+            throw new Error(json.error || `Server error (${response.status})`);
+          }
+        } catch (fetchErr) {
+          if (fetchErr.message && !fetchErr.message.toLowerCase().includes("failed to fetch")) {
+            throw fetchErr;
+          }
+        }
+      }
+
+      // Offline / file:// fallback
+      if (!res) {
+        const rows = this.parseCsvString(this._pendingFacultyCsvText);
+        if (!rows || rows.length < 2) {
+          throw new Error("The CSV file contains no data rows.");
+        }
+        const headers = rows[0].map(h => String(h || "").trim().toLowerCase());
+        const nameIdx = headers.findIndex(h => ["faculty name", "name", "full name", "professor", "faculty_name"].includes(h));
+        const idIdx = headers.findIndex(h => ["faculty id", "employee id", "emp id", "empid", "id", "faculty_id"].includes(h));
+        const desigIdx = headers.findIndex(h => ["designation", "post", "role", "title"].includes(h));
+        const deptIdx = headers.findIndex(h => ["department", "dept", "branch"].includes(h));
+        const phoneIdx = headers.findIndex(h => ["phone number", "phone", "contact number", "mobile", "contact"].includes(h));
+        const emailIdx = headers.findIndex(h => ["email id", "email", "email address", "faculty email"].includes(h));
+
+        if (nameIdx === -1 || emailIdx === -1) {
+          throw new Error("Missing required columns: Faculty Name and Email.");
+        }
+
+        const data = window.db._getData();
+        data.faculty = Array.isArray(data.faculty) ? data.faculty : [];
+        let nextId = data.faculty.reduce((max, f) => Math.max(max, Number(f.id) || 0), 0) + 1;
+        let totalFound = 0;
+        let importedCount = 0;
+        let duplicateCount = 0;
+        let invalidCount = 0;
+        const errors = [];
+        const importedFaculty = [];
+
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || row.every(col => !col || !String(col).trim())) continue;
+          totalFound++;
+
+          const name = String(row[nameIdx] || "").trim();
+          const email = String(row[emailIdx] || "").trim().toLowerCase();
+          const facultyId = idIdx !== -1 ? String(row[idIdx] || "").trim() : "";
+          const desig = desigIdx !== -1 ? String(row[desigIdx] || "").trim() : "Assistant Professor";
+          const dept = deptIdx !== -1 ? String(row[deptIdx] || "").trim() : "CSIT";
+          const phone = phoneIdx !== -1 ? String(row[phoneIdx] || "").trim() : "";
+
+          if (!name || !email) {
+            invalidCount++;
+            errors.push(`Row ${i + 1}: Missing faculty Name or Email.`);
+            continue;
+          }
+
+          const isDup = data.faculty.some(f =>
+            (facultyId && String(f.faculty_id || "").trim().toLowerCase() === facultyId.toLowerCase()) ||
+            String(f.email || "").trim().toLowerCase() === email
+          ) || importedFaculty.some(f =>
+            (facultyId && f.faculty_id.toLowerCase() === facultyId.toLowerCase()) ||
+            f.email.toLowerCase() === email
+          );
+
+          if (isDup) {
+            duplicateCount++;
+            continue;
+          }
+
+          const newFaculty = {
+            id: nextId++,
+            faculty_id: facultyId || `FAC-${nextId}`,
+            name,
+            designation: desig || "Assistant Professor",
+            department: dept || "CSIT",
+            phone: phone || "",
+            email,
+            created_at: new Date().toISOString()
+          };
+
+          data.faculty.push(newFaculty);
+          importedFaculty.push(newFaculty);
+          importedCount++;
+        }
+
+        window.db._saveData(data);
+        res = {
+          success: true,
+          totalFound,
+          importedCount,
+          duplicateCount,
+          invalidCount,
+          errors,
+          faculty: data.faculty
+        };
+      }
+
+      if (progress) progress.style.display = "none";
+      if (results) results.style.display = "block";
+      if (confirmBtn) confirmBtn.style.display = "none";
+
+      document.getElementById("faculty-summary-total").textContent = res.totalFound;
+      document.getElementById("faculty-summary-imported").textContent = res.importedCount;
+      document.getElementById("faculty-summary-duplicates").textContent = res.duplicateCount;
+      document.getElementById("faculty-summary-invalid").textContent = res.invalidCount;
+
+      const errorBox = document.getElementById("faculty-summary-errors-box");
+      if (errorBox) {
+        if (res.errors && res.errors.length > 0) {
+          errorBox.innerHTML = `<strong>Validation Issues:</strong><br>${res.errors.join("<br>")}`;
+          errorBox.style.display = "block";
+        } else {
+          errorBox.style.display = "none";
+        }
+      }
+
+      if (Array.isArray(res.faculty)) {
+        const data = window.db._getData();
+        data.faculty = res.faculty;
+        window.db._saveData(data);
+      }
+      this.renderFaculty();
+      this.renderDashboard();
+
+      this.showToast("Import Successful", `${res.importedCount} faculty member(s) imported into directory.`, "success");
     } catch (err) {
       if (progress) progress.style.display = "none";
       if (confirmBtn) confirmBtn.disabled = false;
@@ -3838,6 +4453,29 @@ class DGIApp {
       event.preventDefault();
       this.savePreparedMessage("prepared");
     });
+
+    // CSV Drag & Drop handlers
+    const setupDropZone = (dropZoneId, handler) => {
+      const zone = document.getElementById(dropZoneId);
+      if (!zone) return;
+      zone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        zone.style.borderColor = "var(--accent-primary)";
+      });
+      zone.addEventListener("dragleave", () => {
+        zone.style.borderColor = "var(--border-color)";
+      });
+      zone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        zone.style.borderColor = "var(--border-color)";
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          handler({ target: { files: e.dataTransfer.files } });
+        }
+      });
+    };
+    setupDropZone("csv-drop-zone", (e) => this.handleCsvFileSelection(e));
+    setupDropZone("student-csv-drop-zone", (e) => this.handleStudentCsvFileSelection(e));
+    setupDropZone("faculty-csv-drop-zone", (e) => this.handleFacultyCsvFileSelection(e));
   }
 }
 
