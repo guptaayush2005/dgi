@@ -104,6 +104,10 @@
         <button class="auth-mode-button" id="show-register" type="button">Create Account</button>
       </div>
 
+      <div id="file-protocol-banner" style="display: none; background: rgba(255, 197, 0, 0.12); border: 1px solid rgba(255, 197, 0, 0.4); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 12px; color: #ffc500; line-height: 1.4;">
+        <span>ℹ️</span> <strong>Local File Mode:</strong> You opened this file directly from your computer. For the full live database, open <a href="https://dgi-tau.vercel.app/" target="_blank" style="color: #fff; text-decoration: underline; font-weight: 700;">dgi-tau.vercel.app</a> or run <code style="background: rgba(0,0,0,0.4); padding: 2px 5px; border-radius: 4px; color: #fff1cc;">open_app.bat</code>.
+      </div>
+
       <form id="login-form" class="auth-form" method="POST" action="javascript:void(0);">
         <div class="auth-field">
           <label class="auth-label" for="login-username">Username or Email</label>
@@ -242,6 +246,20 @@
         return result;
       }
 
+      function getLocalAccounts() {
+        try {
+          return JSON.parse(localStorage.getItem("dgi_local_accounts") || "{}");
+        } catch {
+          return {};
+        }
+      }
+
+      function saveLocalAccounts(accounts) {
+        try {
+          localStorage.setItem("dgi_local_accounts", JSON.stringify(accounts));
+        } catch {}
+      }
+
       async function submitCredentials(path, username, password) {
         if (submitBtn) {
           submitBtn.disabled = true;
@@ -250,16 +268,61 @@
         }
         showMessage("");
 
-        try {
-          const response = await fetch(path, {
-            method: "POST",
-            credentials: "same-origin",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username, password })
-          });
-          const result = await readResponse(response, "Authentication failed. Please check your credentials.");
-          const authUser = result.username || username;
+        let authUser = username;
+        let loggedIn = false;
 
+        // 1. If running via web server (HTTP / HTTPS e.g. Vercel or localhost)
+        if (["http:", "https:"].includes(window.location.protocol)) {
+          try {
+            const response = await fetch(path, {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ username, password })
+            });
+            const result = await readResponse(response, "Authentication failed. Invalid username or password.");
+            authUser = result.username || username;
+            loggedIn = true;
+          } catch (err) {
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = submitBtn.dataset.originalText || "Sign in";
+            }
+            if (err.message && err.message.toLowerCase().includes("failed to fetch")) {
+              showMessage("Cannot reach LMS server. Start 'open_app.bat' or visit https://dgi-tau.vercel.app/");
+            } else {
+              showMessage(err.message || "Invalid credentials.");
+            }
+            return;
+          }
+        } else {
+          // 2. Direct File Mode (file:/// protocol without server)
+          const u = String(username || "").trim().toLowerCase();
+          const p = String(password || "");
+          const accounts = getLocalAccounts();
+
+          if (u === "admin" && p === "admin123") {
+            authUser = "admin";
+            loggedIn = true;
+          } else if (accounts[u] && accounts[u].password === p) {
+            authUser = accounts[u].username || username;
+            loggedIn = true;
+          } else if (path.includes("register") || path.includes("setup")) {
+            accounts[u] = { username, password: p, isPrimary: Object.keys(accounts).length === 0 };
+            saveLocalAccounts(accounts);
+            authUser = username;
+            loggedIn = true;
+          } else {
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = submitBtn.dataset.originalText || "Sign in";
+            }
+            showMessage("Invalid username or password. (Default is admin / admin123)");
+            return;
+          }
+        }
+
+        if (loggedIn) {
           const sessionData = JSON.stringify({
             username: authUser,
             isPrimary: true,
@@ -267,24 +330,19 @@
           });
           sessionStorage.setItem("dgi_admin_session", sessionData);
           localStorage.setItem("dgi_admin_session", sessionData);
-          showMessage("Authentication successful. Redirecting to Admin Dashboard...", false);
+          showMessage("Sign in successful. Redirecting to Admin Dashboard...", false);
           setTimeout(() => {
             window.location.replace("index.html");
           }, 200);
-        } catch (err) {
-          showMessage(err.message || "Invalid credentials.");
-          if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.textContent = submitBtn.dataset.originalText || "Sign in";
-          }
-          throw err;
         }
       }
 
       window.adminAuth = {
         async logout() {
           try {
-            await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+            if (["http:", "https:"].includes(window.location.protocol)) {
+              await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+            }
           } catch (e) {}
           sessionStorage.removeItem("dgi_admin_session");
           localStorage.removeItem("dgi_admin_session");
@@ -292,8 +350,25 @@
         }
       };
 
-      // Check server session on page load
+      // Check session on page load
       (async function checkCurrentSession() {
+        if (!["http:", "https:"].includes(window.location.protocol)) {
+          // File mode: show informational banner and check local session
+          const fileBanner = document.getElementById("file-protocol-banner");
+          if (fileBanner) fileBanner.style.display = "block";
+          try {
+            const raw = sessionStorage.getItem("dgi_admin_session") || localStorage.getItem("dgi_admin_session");
+            if (raw) {
+              const s = JSON.parse(raw);
+              if (s && s.username) {
+                window.location.replace("index.html");
+                return;
+              }
+            }
+          } catch (e) {}
+          return;
+        }
+
         try {
           const res = await fetch("/api/auth/status", { credentials: "same-origin" });
           if (res.ok) {

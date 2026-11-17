@@ -42,17 +42,41 @@
 
     // 1. Server login
     if (["http:", "https:"].includes(window.location.protocol)) {
-      const response = await fetch(path, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password })
-      });
-      const result = await readResponse(response, "Authentication failed. Invalid username or password.");
-      authUser = result.username || username;
-      loggedIn = true;
+      try {
+        const response = await fetch(path, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password })
+        });
+        const result = await readResponse(response, "Authentication failed. Invalid username or password.");
+        authUser = result.username || username;
+        loggedIn = true;
+      } catch (err) {
+        if (err.message && err.message.toLowerCase().includes("failed to fetch")) {
+          throw new Error("Cannot reach LMS server. Start 'open_app.bat' or visit https://dgi-tau.vercel.app/");
+        }
+        throw err;
+      }
     } else {
-      throw new Error("Authentication requires a connection to the server.");
+      // 2. Direct file:// mode
+      const u = String(username || "").trim().toLowerCase();
+      const p = String(password || "");
+      const accounts = getLocalAccounts();
+      if (u === "admin" && p === "admin123") {
+        authUser = "admin";
+        loggedIn = true;
+      } else if (accounts[u] && accounts[u].password === p) {
+        authUser = accounts[u].username || username;
+        loggedIn = true;
+      } else if (path.includes("register") || path.includes("setup")) {
+        accounts[u] = { username, password: p, isPrimary: Object.keys(accounts).length === 0 };
+        saveLocalAccounts(accounts);
+        authUser = username;
+        loggedIn = true;
+      } else {
+        throw new Error("Invalid username or password. (Default is admin / admin123)");
+      }
     }
 
     if (loggedIn) {
