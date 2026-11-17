@@ -67,6 +67,52 @@ function verifyPassword(password, salt, expectedHash) {
 // ---------------------------------------------------------------------------
 // Persistent store (single JSON file)
 // ---------------------------------------------------------------------------
+function defaultLibraryState() {
+  const books = [
+    { id: 1, title: "Data Structures & Algorithms in C++", author: "Mark Allen Weiss", isbn: "978-0132847377", category: "CSIT", shelf_location: "Stack CS-101", total_copies: 5, available_copies: 3 },
+    { id: 2, title: "Database System Concepts", author: "Silberschatz, Korth, Sudarshan", isbn: "978-0078022159", category: "CSIT", shelf_location: "Stack CS-102", total_copies: 6, available_copies: 1 },
+    { id: 3, title: "Operating System Concepts", author: "Abraham Silberschatz, Peter B. Galvin", isbn: "978-1118063330", category: "CSIT", shelf_location: "Stack CS-103", total_copies: 4, available_copies: 2 },
+    { id: 4, title: "Computer Networks", author: "Andrew S. Tanenbaum", isbn: "978-0132126953", category: "CSIT", shelf_location: "Stack CS-104", total_copies: 5, available_copies: 4 },
+    { id: 5, title: "Artificial Intelligence: A Modern Approach", author: "Stuart Russell, Peter Norvig", isbn: "978-0136042594", category: "CSIT", shelf_location: "Stack CS-105", total_copies: 3, available_copies: 1 },
+    { id: 6, title: "Web Technologies: HTML, CSS, JavaScript & PHP", author: "Uttam K. Roy", isbn: "978-0198066224", category: "CSIT", shelf_location: "Stack CS-106", total_copies: 4, available_copies: 3 },
+    { id: 7, title: "Theory of Computer Science: Automata, Languages", author: "K.L.P. Mishra, N. Chandrasekaran", isbn: "978-8120329683", category: "CSIT", shelf_location: "Stack CS-107", total_copies: 4, available_copies: 2 },
+    { id: 8, title: "Software Engineering: A Practitioner's Approach", author: "Roger S. Pressman", isbn: "978-0078022128", category: "CSIT", shelf_location: "Stack CS-108", total_copies: 5, available_copies: 0 },
+    { id: 9, title: "Electronic Devices and Circuit Theory", author: "Robert L. Boylestad, Louis Nashelsky", isbn: "978-0137692828", category: "Electronics", shelf_location: "Stack EC-201", total_copies: 3, available_copies: 1 },
+    { id: 10, title: "Engineering Mechanics: Statics and Dynamics", author: "S. Timoshenko, D.H. Young", isbn: "978-0070616806", category: "Mechanical", shelf_location: "Stack ME-301", total_copies: 5, available_copies: 4 }
+  ];
+  const students = [
+    { id: 1, name: "Ayush Gupta", roll_no: "CS101", department: "CSIT", email: "ayush.csit@dronacharya.info", phone: "+91 98765 43210" },
+    { id: 2, name: "Priya Sharma", roll_no: "CS102", department: "CSIT", email: "priya.csit@dronacharya.info", phone: "+91 98765 43211" },
+    { id: 3, name: "Rahul Verma", roll_no: "CS103", department: "CSIT", email: "rahul.csit@dronacharya.info", phone: "+91 98765 43212" },
+    { id: 4, name: "Ananya Singh", roll_no: "CS104", department: "CSIT", email: "ananya.csit@dronacharya.info", phone: "+91 98765 43213" },
+    { id: 5, name: "Amit Kumar", roll_no: "ME101", department: "Mechanical", email: "amit.me@dronacharya.info", phone: "+91 98765 43214" }
+  ];
+  const transactions = [
+    { id: 1, student_id: 1, book_id: 2, book_title: "Database System Concepts", book_isbn: "978-0078022159", issue_date: "2026-11-05", due_date: "2026-11-19", return_date: null, status: "issued", fine: 0, reissue_count: 0 },
+    { id: 2, student_id: 1, book_id: 1, book_title: "Data Structures & Algorithms in C++", book_isbn: "978-0132847377", issue_date: "2026-10-10", due_date: "2026-10-24", return_date: "2026-10-22", status: "returned", fine: 0, reissue_count: 0 },
+    { id: 3, student_id: 1, book_id: 3, book_title: "Operating System Concepts", book_isbn: "978-1118063330", issue_date: "2026-09-01", due_date: "2026-09-15", return_date: "2026-09-14", status: "returned", fine: 0, reissue_count: 0 },
+    { id: 4, student_id: 2, book_id: 8, book_title: "Software Engineering: A Practitioner's Approach", book_isbn: "978-0078022128", issue_date: "2026-11-01", due_date: "2026-11-15", return_date: null, status: "issued", fine: 10, reissue_count: 1 }
+  ];
+  return {
+    books,
+    students,
+    faculty: [],
+    transactions,
+    faculty_transactions: [],
+    alert_logs: [],
+    settings: {
+      library_name: "DGI Central Library",
+      institution_name: "Dronacharya Group of Institutions, Greater Noida",
+      address: "#27, APJ Abdul Kalam Road, Knowledge Park-III, Greater Noida, Uttar Pradesh - 201306",
+      phone: "0120-2322022, 2323851-56",
+      email: "info@dronacharya.info",
+      established: "2006",
+      fine_per_day: 5.0,
+      currency: "₹"
+    }
+  };
+}
+
 function emptyStore() {
   return {
     accounts: [],          // { username, key, salt, hash, isPrimary, createdAt }
@@ -89,7 +135,7 @@ function seedStore() {
     isPrimary: true,
     createdAt: new Date().toISOString()
   });
-  store.states.admin = { state: null, revision: 0 };
+  store.states.admin = { state: defaultLibraryState(), revision: 1 };
   store.messages.admin = [];
   store.reissueRequests.admin = [];
   return store;
@@ -115,6 +161,10 @@ function loadStore() {
       loaded.states = { ...seed.states, ...loaded.states };
       loaded.messages = { ...seed.messages, ...loaded.messages };
       loaded.reissueRequests = { ...seed.reissueRequests, ...loaded.reissueRequests };
+    }
+    if (!loaded.states || !loaded.states.admin || !loaded.states.admin.state) {
+      loaded.states = loaded.states || {};
+      loaded.states.admin = { state: defaultLibraryState(), revision: 1 };
     }
     return loaded;
   } catch {
@@ -246,8 +296,10 @@ async function handleRequest(req, res) {
     // ============================ STUDENT PORTAL API =======================
     if (p === '/api/student/books' && method === 'GET') {
       const primaryKey = (store.accounts.find(a => a.isPrimary) || store.accounts[0] || {}).key || 'admin';
-      const state = (store.states[primaryKey] || {}).state || {};
-      const books = Array.isArray(state.books) ? state.books : [];
+      const defaultState = defaultLibraryState();
+      const rawState = (store.states[primaryKey] || {}).state;
+      const state = (rawState && typeof rawState === 'object') ? rawState : defaultState;
+      const books = (Array.isArray(state.books) && state.books.length > 0) ? state.books : defaultState.books;
       const publicBooks = books.map(b => ({
         id: b.id,
         title: b.title,
@@ -266,9 +318,11 @@ async function handleRequest(req, res) {
       if (!rollNo) return send(res, 400, { error: 'Roll number is required.' });
 
       const primaryKey = (store.accounts.find(a => a.isPrimary) || store.accounts[0] || {}).key || 'admin';
-      const state = (store.states[primaryKey] || {}).state || {};
-      const students = Array.isArray(state.students) ? state.students : [];
-      const transactions = Array.isArray(state.transactions) ? state.transactions : [];
+      const defaultState = defaultLibraryState();
+      const rawState = (store.states[primaryKey] || {}).state;
+      const state = (rawState && typeof rawState === 'object') ? rawState : defaultState;
+      const students = (Array.isArray(state.students) && state.students.length > 0) ? state.students : defaultState.students;
+      const transactions = (Array.isArray(state.transactions) && state.transactions.length > 0) ? state.transactions : defaultState.transactions;
 
       const student = students.find(s => String(s.roll_no || '').trim().toLowerCase() === rollNo);
       if (!student) {
