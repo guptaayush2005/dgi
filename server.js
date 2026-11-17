@@ -760,7 +760,10 @@ async function handleRequest(req, res) {
 
     // ========================= STATIC FILES ================================
     let file = p === '/' ? '/index.html' : p;
-    const full = path.join(ROOT, decodeURIComponent(file));
+    let full = path.join(ROOT, decodeURIComponent(file));
+    if (!fs.existsSync(full) && fs.existsSync(full + '.html')) {
+      full = full + '.html';
+    }
     if (!full.startsWith(ROOT) || !fs.existsSync(full) || fs.statSync(full).isDirectory()) {
       return send(res, 404, 'Not found', 'text/plain; charset=utf-8');
     }
