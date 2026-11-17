@@ -32,7 +32,7 @@ const crypto = require('crypto');
 const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0';
 const ROOT = __dirname;
-const DATA_DIR = path.join(ROOT, 'data');
+const DATA_DIR = process.env.VERCEL ? path.join('/tmp', 'data') : path.join(ROOT, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'library-data.json');
 const SESSION_COOKIE = 'dgi_lms_session';
 const REISSUE_EXTENSION_DAYS = 7;
@@ -95,13 +95,17 @@ function seedStore() {
   return store;
 }
 function loadStore() {
-  if (!fs.existsSync(DATA_FILE)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-    const seed = seedStore();
-    fs.writeFileSync(DATA_FILE, JSON.stringify(seed, null, 2));
-    return seed;
-  }
   try {
+    if (!fs.existsSync(DATA_FILE)) {
+      try {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+        const seed = seedStore();
+        fs.writeFileSync(DATA_FILE, JSON.stringify(seed, null, 2));
+        return seed;
+      } catch {
+        return seedStore();
+      }
+    }
     const parsed = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     const loaded = Object.assign(emptyStore(), parsed);
     loaded.sessions ||= {};
@@ -117,7 +121,7 @@ function loadStore() {
     return seedStore();
   }
 }
-let store = process.env.VERCEL ? emptyStore() : loadStore();
+let store = loadStore();
 let persistenceAdapter = null;
 function getStore() { return store; }
 function setStore(nextStore) {
@@ -129,11 +133,19 @@ function setPersistenceAdapter(adapter) {
 }
 async function saveStore() {
   if (persistenceAdapter) {
-    await persistenceAdapter(store);
-    return;
+    try {
+      await persistenceAdapter(store);
+      return;
+    } catch (e) {
+      console.warn("Adapter save failed:", e);
+    }
   }
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(DATA_FILE, JSON.stringify(store, null, 2));
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(DATA_FILE, JSON.stringify(store, null, 2));
+  } catch (err) {
+    console.warn("Local data file write failed:", err);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -769,4 +781,14 @@ if (require.main === module) {
   });
 }
 
-module.exports = { handleRequest, getStore, setStore, setPersistenceAdapter, emptyStore };
+function handler(req, res) {
+  return handleRequest(req, res);
+}
+
+module.exports = handler;
+module.exports.handler = handler;
+module.exports.handleRequest = handleRequest;
+module.exports.getStore = getStore;
+module.exports.setStore = setStore;
+module.exports.setPersistenceAdapter = setPersistenceAdapter;
+module.exports.emptyStore = emptyStore;

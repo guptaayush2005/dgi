@@ -1,4 +1,4 @@
-const { handleRequest, setStore, setPersistenceAdapter, emptyStore } = require('../server');
+const { handleRequest, setStore, setPersistenceAdapter, emptyStore, getStore } = require('../server');
 
 let blobSdkPromise;
 let blobSdk;
@@ -10,17 +10,25 @@ async function getBlobSdk() {
 }
 
 async function readStore() {
-  const { get } = await getBlobSdk();
-  const result = await get('library-data.json', {
-    access: 'private',
-    useCache: false
-  });
-  if (!result) return { store: emptyStore(), etag: null };
-  if (result.statusCode !== 200 || !result.stream) {
-    throw new Error('The persistent library database could not be read.');
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    return { store: getStore(), etag: null };
   }
-  const parsed = JSON.parse(await new Response(result.stream).text());
-  return { store: parsed, etag: result.blob.etag };
+  try {
+    const { get } = await getBlobSdk();
+    const result = await get('library-data.json', {
+      access: 'private',
+      useCache: false
+    });
+    if (!result) return { store: getStore(), etag: null };
+    if (result.statusCode !== 200 || !result.stream) {
+      return { store: getStore(), etag: null };
+    }
+    const parsed = JSON.parse(await new Response(result.stream).text());
+    return { store: parsed, etag: result.blob.etag };
+  } catch (err) {
+    console.warn('Vercel blob read failed, using local store:', err);
+    return { store: getStore(), etag: null };
+  }
 }
 
 function sameValue(left, right) {
@@ -57,55 +65,67 @@ function mergeConcurrentStore(baseStore, changedStore, latestStore) {
 
 async function processRequest(req, res) {
   let currentEtag = null;
-  let baseStore = emptyStore();
+  let baseStore = getStore();
   try {
     const loaded = await readStore();
     currentEtag = loaded.etag;
     baseStore = loaded.store;
     setStore(loaded.store);
-    setPersistenceAdapter(async nextStore => {
-      const { put } = await getBlobSdk();
-      let candidate = structuredClone(nextStore);
-      for (let attempt = 0; attempt < 12; attempt += 1) {
+
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+      setPersistenceAdapter(async nextStore => {
         try {
-          const saved = await put('library-data.json', JSON.stringify(candidate), {
-            access: 'private',
-            addRandomSuffix: false,
-            allowOverwrite: Boolean(currentEtag),
-            ifMatch: currentEtag || undefined,
-            contentType: 'application/json',
-            cacheControlMaxAge: 0
-          });
-          currentEtag = saved.etag;
-          setStore(candidate);
-          return;
-        } catch (error) {
-          const etagConflict = error?.name === 'BlobPreconditionFailedError' || error?.name === 'BlobAlreadyExistsError' || error?.status === 412 || error?.statusCode === 412 || error?.status === 409;
-          if (!etagConflict) throw error;
-          if (attempt === 11) {
-            const conflict = new Error('The library is receiving several saves at once. Wait a moment and reload the page.');
-            conflict.statusCode = 503;
-            throw conflict;
+          const { put } = await getBlobSdk();
+          let candidate = structuredClone(nextStore);
+          for (let attempt = 0; attempt < 12; attempt += 1) {
+            try {
+              const saved = await put('library-data.json', JSON.stringify(candidate), {
+                access: 'private',
+                addRandomSuffix: false,
+                allowOverwrite: Boolean(currentEtag),
+                ifMatch: currentEtag || undefined,
+                contentType: 'application/json',
+                cacheControlMaxAge: 0
+              });
+              currentEtag = saved.etag;
+              setStore(candidate);
+              return;
+            } catch (error) {
+              const etagConflict = error?.name === 'BlobPreconditionFailedError' || error?.name === 'BlobAlreadyExistsError' || error?.status === 412 || error?.statusCode === 412 || error?.status === 409;
+              if (!etagConflict) throw error;
+              if (attempt === 11) {
+                const conflict = new Error('The library is receiving several saves at once. Wait a moment and reload the page.');
+                conflict.statusCode = 503;
+                throw conflict;
+              }
+              await new Promise(resolve => setTimeout(resolve, Math.min(25 * (attempt + 1), 200) + Math.floor(Math.random() * 40)));
+              const latest = await readStore();
+              try {
+                candidate = mergeConcurrentStore(baseStore, candidate, latest.store);
+              } catch (mergeError) {
+                mergeError.statusCode = 409;
+                throw mergeError;
+              }
+              baseStore = latest.store;
+              currentEtag = latest.etag;
+            }
           }
-          await new Promise(resolve => setTimeout(resolve, Math.min(25 * (attempt + 1), 200) + Math.floor(Math.random() * 40)));
-          const latest = await readStore();
-          try {
-            candidate = mergeConcurrentStore(baseStore, candidate, latest.store);
-          } catch (mergeError) {
-            mergeError.statusCode = 409;
-            throw mergeError;
-          }
-          baseStore = latest.store;
-          currentEtag = latest.etag;
+        } catch (err) {
+          console.warn('Vercel blob save failed:', err);
         }
-      }
-    });
+      });
+    }
+
     await handleRequest(req, res);
   } catch (error) {
     console.error('Vercel storage request failed:', error);
-    if (!res.headersSent) {
-      res.writeHead(Number(error.statusCode) || 500, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ error: Number(error.statusCode) === 409 ? error.message : 'Library storage is unavailable.' }));
+    try {
+      await handleRequest(req, res);
+    } catch {
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: 'Library storage is unavailable.' }));
+      }
     }
   } finally {
     setPersistenceAdapter(null);
