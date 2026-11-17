@@ -1499,20 +1499,8 @@ async function handleRequest(req, res) {
     if (p.startsWith('/api/')) return send(res, 404, { error: 'API endpoint not found.' });
 
     // ========================= STATIC FILES ================================
-    // Root path '/' serves login.html first if unauthenticated, index.html if authenticated
+    // Root path '/' always serves login.html first
     if (p === '/' || p === '' || p === '/login' || p === '/login.html') {
-      const account = requestAccount(req);
-      if (p === '/login' || p === '/login.html') {
-        const asset = STATIC_ASSETS['/login.html'];
-        if (asset && fs.existsSync(asset.file)) {
-          return send(res, 200, fs.readFileSync(asset.file), asset.type, { 'Cache-Control': 'no-cache, no-store, must-revalidate' });
-        }
-      }
-      if (account) {
-        res.writeHead(302, { 'Location': '/index.html', 'Cache-Control': 'no-store, no-cache' });
-        res.end();
-        return;
-      }
       const asset = STATIC_ASSETS['/login.html'];
       if (asset && fs.existsSync(asset.file)) {
         return send(res, 200, fs.readFileSync(asset.file), asset.type, { 'Cache-Control': 'no-cache, no-store, must-revalidate' });

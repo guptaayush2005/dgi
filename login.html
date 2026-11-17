@@ -104,6 +104,13 @@
         <button class="auth-mode-button" id="show-register" type="button">Create Account</button>
       </div>
 
+      <div id="active-session-banner" style="display: none; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.45); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; font-size: 13px; color: #a7f3d0; line-height: 1.4;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+          <div><span>✅</span> <span id="active-session-text">You are signed in as administrator.</span></div>
+          <a href="index.html" class="btn btn-primary" style="display: inline-block; padding: 6px 14px; font-size: 12px; font-weight: 800; text-decoration: none; border-radius: 6px; background: #ffc500; color: #16010b;">Go to Dashboard →</a>
+        </div>
+      </div>
+
       <div id="file-protocol-banner" style="display: none; background: rgba(255, 197, 0, 0.12); border: 1px solid rgba(255, 197, 0, 0.4); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 12px; color: #ffc500; line-height: 1.4;">
         <span>ℹ️</span> <strong>Local File Mode:</strong> You opened this file directly from your computer. For the full live database, open <a href="https://dgi-tau.vercel.app/" target="_blank" style="color: #fff; text-decoration: underline; font-weight: 700;">dgi-tau.vercel.app</a> or run <code style="background: rgba(0,0,0,0.4); padding: 2px 5px; border-radius: 4px; color: #fff1cc;">open_app.bat</code>.
       </div>
@@ -350,19 +357,25 @@
         }
       };
 
-      // Check session on page load
+      // Check session on page load (shows status without auto-forwarding)
       (async function checkCurrentSession() {
         if (!["http:", "https:"].includes(window.location.protocol)) {
           // File mode: show informational banner and check local session
           const fileBanner = document.getElementById("file-protocol-banner");
           if (fileBanner) fileBanner.style.display = "block";
           try {
-            const raw = sessionStorage.getItem("dgi_admin_session") || localStorage.getItem("dgi_admin_session");
+            const raw = sessionStorage.getItem("dgi_admin_session");
             if (raw) {
               const s = JSON.parse(raw);
               if (s && s.username) {
-                window.location.replace("index.html");
-                return;
+                const activeBanner = document.getElementById("active-session-banner");
+                const activeText = document.getElementById("active-session-text");
+                if (activeBanner && activeText) {
+                  activeText.innerHTML = `Active session found for <strong>${s.username}</strong>.`;
+                  activeBanner.style.display = "block";
+                }
+                const userInput = document.getElementById("login-username");
+                if (userInput && !userInput.value) userInput.value = s.username;
               }
             }
           } catch (e) {}
@@ -380,8 +393,14 @@
               });
               sessionStorage.setItem("dgi_admin_session", sessionData);
               localStorage.setItem("dgi_admin_session", sessionData);
-              window.location.replace("index.html");
-              return;
+              const activeBanner = document.getElementById("active-session-banner");
+              const activeText = document.getElementById("active-session-text");
+              if (activeBanner && activeText) {
+                activeText.innerHTML = `You are already signed in as <strong>${data.username || "admin"}</strong>.`;
+                activeBanner.style.display = "block";
+              }
+              const userInput = document.getElementById("login-username");
+              if (userInput && !userInput.value) userInput.value = data.username || "admin";
             } else {
               sessionStorage.removeItem("dgi_admin_session");
               localStorage.removeItem("dgi_admin_session");

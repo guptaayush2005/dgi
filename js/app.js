@@ -4303,6 +4303,11 @@ class DGIApp {
     document.getElementById("modal-return-slip").classList.add("active");
   }
 
+  openModal(modalId) {
+    const m = document.getElementById(modalId);
+    if (m) m.classList.add("active");
+  }
+
   closeModal(modalId) {
     const m = document.getElementById(modalId);
     if (m) m.classList.remove("active");
@@ -4476,6 +4481,13 @@ class DGIApp {
     setupDropZone("csv-drop-zone", (e) => this.handleCsvFileSelection(e));
     setupDropZone("student-csv-drop-zone", (e) => this.handleStudentCsvFileSelection(e));
     setupDropZone("faculty-csv-drop-zone", (e) => this.handleFacultyCsvFileSelection(e));
+
+    // Close modal on backdrop click
+    document.querySelectorAll(".modal-backdrop").forEach(backdrop => {
+      backdrop.addEventListener("click", (e) => {
+        if (e.target === backdrop) backdrop.classList.remove("active");
+      });
+    });
   }
 }
 

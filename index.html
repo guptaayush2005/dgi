@@ -35,9 +35,9 @@
         return false;
       }
 
-      // 2. Offline / local file protocol fallback
+      // 2. Offline / local file protocol fallback (requires login via login.html in current session)
       try {
-        const raw = sessionStorage.getItem("dgi_admin_session") || localStorage.getItem("dgi_admin_session");
+        const raw = sessionStorage.getItem("dgi_admin_session");
         if (raw) {
           const session = JSON.parse(raw);
           if (session && session.username) {
