@@ -289,7 +289,10 @@ async function handleRequest(req, res) {
   }
 
   const url = new URL(req.url, 'http://localhost');
-  const p = url.pathname;
+  let p = url.searchParams.get('_path') || req.headers['x-forwarded-uri'] || req.headers['x-matched-path'] || url.pathname;
+  if (p.startsWith('/api/index.js') || p === '/api') {
+    p = url.searchParams.get('_path') || req.headers['x-forwarded-uri'] || '/';
+  }
   const method = req.method;
 
   try {
