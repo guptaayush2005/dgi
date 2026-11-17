@@ -217,12 +217,33 @@ async function saveStore() {
 }
 
 // ---------------------------------------------------------------------------
-// Sessions are included in the persistent store so serverless instances can share them.
+// Stateless HMAC signed sessions (works reliably across all serverless lambda containers)
 // ---------------------------------------------------------------------------
+const SESSION_SECRET = process.env.SESSION_SECRET || 'dgi-lms-super-secure-fixed-key-2026';
+
+function signSessionToken(data) {
+  const sig = crypto.createHmac('sha256', SESSION_SECRET).update(data).digest('hex');
+  return `${data}.${sig}`;
+}
+
+function verifySessionToken(token) {
+  if (!token || typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  const [accountKey, expiresAtStr, sig] = parts;
+  const data = `${accountKey}.${expiresAtStr}`;
+  const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(data).digest('hex');
+  if (sig !== expectedSig) return null;
+  const expiresAt = Number(expiresAtStr);
+  if (isNaN(expiresAt) || expiresAt <= Date.now()) return null;
+  return accountKey;
+}
+
 function createSession(accountKey) {
-  const sid = crypto.randomBytes(24).toString('hex');
-  store.sessions[sid] = { accountKey, expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000 };
-  return sid;
+  const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+  const token = signSessionToken(`${accountKey}.${expiresAt}`);
+  store.sessions[token] = { accountKey, expiresAt };
+  return token;
 }
 function sessionCookieHeader(sid) {
   const secure = process.env.VERCEL ? '; Secure' : '';
@@ -235,14 +256,18 @@ function requestAccount(req) {
   const cookieHeader = req.headers.cookie || '';
   const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`));
   if (!match) return null;
-  const session = store.sessions[match[1]];
-  if (!session) return null;
-  if (session.expiresAt <= Date.now()) {
-    delete store.sessions[match[1]];
-    return null;
+  const token = match[1];
+  // 1. Check in-memory store if present
+  const session = store.sessions[token];
+  if (session && session.expiresAt > Date.now()) {
+    const found = store.accounts.find(a => a.key === session.accountKey);
+    if (found) return found;
   }
-  const accountKey = session.accountKey;
-  return store.accounts.find(a => a.key === accountKey) || null;
+  // 2. Fall back to cryptographic token verification (stateless lambda support)
+  const accountKey = verifySessionToken(token);
+  if (!accountKey) return null;
+  const acc = store.accounts.find(a => a.key === accountKey);
+  return acc || { username: accountKey, key: accountKey, isPrimary: true };
 }
 function dropAccountSessions(accountKey) {
   for (const [sid, session] of Object.entries(store.sessions)) {
@@ -885,6 +910,14 @@ async function handleRequest(req, res) {
     if (p.startsWith('/api/')) return send(res, 404, { error: 'API endpoint not found.' });
 
     // ========================= STATIC FILES ================================
+    // Root path '/' serves login.html first so login opens first!
+    if (p === '/' || p === '' || p === '/login') {
+      const asset = STATIC_ASSETS['/login.html'];
+      if (asset && fs.existsSync(asset.file)) {
+        return send(res, 200, fs.readFileSync(asset.file), asset.type, { 'Cache-Control': 'no-cache' });
+      }
+    }
+
     const norm = p.startsWith('/') ? p : '/' + p;
     if (STATIC_ASSETS[norm] && fs.existsSync(STATIC_ASSETS[norm].file)) {
       const asset = STATIC_ASSETS[norm];

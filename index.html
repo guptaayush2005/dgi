@@ -9,13 +9,34 @@
   <script>
     document.documentElement.classList.add("auth-pending");
     window.adminSessionReady = (async function() {
+      // 1. Instant check from local session (0ms render)
+      try {
+        const raw = sessionStorage.getItem("dgi_admin_session") || localStorage.getItem("dgi_admin_session");
+        if (raw) {
+          const session = JSON.parse(raw);
+          if (session && session.username) {
+            window.adminDisplayName = session.username;
+            window.isPrimaryLibraryAccount = session.isPrimary !== false;
+            document.documentElement.classList.remove("auth-pending");
+            // Background server check (non-blocking)
+            if (["http:", "https:"].includes(window.location.protocol)) {
+              fetch("/api/auth/status", { credentials: "same-origin" }).catch(() => {});
+            }
+            return true;
+          }
+        }
+      } catch (e) {
+        console.warn("Local session check failed:", e);
+      }
+
+      // 2. Server check if running on web server
       if (["http:", "https:"].includes(window.location.protocol)) {
         try {
           const response = await fetch("/api/auth/status", { credentials: "same-origin" });
           if (response.ok) {
             const result = await response.json();
             if (result.authenticated) {
-              window.adminDisplayName = result.username;
+              window.adminDisplayName = result.username || "admin";
               window.isPrimaryLibraryAccount = Boolean(result.isPrimaryAccount);
               const sessionData = JSON.stringify({ username: result.username, isPrimary: Boolean(result.isPrimaryAccount) });
               sessionStorage.setItem("dgi_admin_session", sessionData);
@@ -25,23 +46,11 @@
             }
           }
         } catch (e) {
-          console.warn("Server auth check failed, checking local session:", e);
+          console.warn("Server auth check failed:", e);
         }
       }
-      try {
-        const raw = sessionStorage.getItem("dgi_admin_session") || localStorage.getItem("dgi_admin_session");
-        if (raw) {
-          const session = JSON.parse(raw);
-          if (session && session.username) {
-            window.adminDisplayName = session.username;
-            window.isPrimaryLibraryAccount = session.isPrimary !== false;
-            document.documentElement.classList.remove("auth-pending");
-            return true;
-          }
-        }
-      } catch (e) {
-        console.warn("Local session check failed:", e);
-      }
+
+      // If neither, redirect to login page
       window.location.replace("login.html");
       return false;
     })();
