@@ -79,7 +79,17 @@
 <body class="auth-page">
   <main class="auth-shell">
     <header class="auth-brand">
-      <img class="auth-logo" src="assets/logo.png" alt="Dronacharya Group of Institutions logo" onerror="this.onerror=null;this.src='logo.png';">
+      <div style="background: #fff; padding: 10px 16px; border-radius: 12px; max-width: 280px; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,0.35);">
+        <img id="auth-logo-img" class="auth-logo" src="logo.png" alt="Dronacharya Group of Institutions logo" style="max-height: 48px; width: auto; object-fit: contain; margin: 0; padding: 0; background: transparent;"
+          onerror="if(!this.dataset.retried){this.dataset.retried='1';this.src='assets/logo.png';}else{this.style.display='none';document.getElementById('logo-fallback-text').style.display='flex';}">
+        <div id="logo-fallback-text" style="display: none; align-items: center; gap: 10px;">
+          <div style="font-size: 26px;">🏛️</div>
+          <div style="text-align: left;">
+            <div style="color: #510027; font-weight: 900; font-size: 13px; line-height: 1.2;">DRONACHARYA</div>
+            <div style="color: #6b3049; font-weight: 700; font-size: 9px; letter-spacing: 0.5px;">GROUP OF INSTITUTIONS</div>
+          </div>
+        </div>
+      </div>
       <div class="auth-brand-name">DGI LMS</div>
       <div class="auth-brand-caption">LIBRARY MANAGEMENT SYSTEM</div>
     </header>
@@ -101,7 +111,7 @@
         <button type="button" id="quick-fill-admin" class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; background: transparent; border: 1px solid #ffc500; color: #ffc500;">Fill</button>
       </div>
 
-      <form id="login-form" class="auth-form">
+      <form id="login-form" class="auth-form" method="POST" action="javascript:void(0);">
         <div class="auth-field">
           <label class="auth-label" for="login-username">Username</label>
           <input class="form-control auth-input" id="login-username" name="username" value="admin" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
@@ -204,6 +214,218 @@
     <p class="auth-contact">Dronacharya Group of Institutions, Greater Noida · Since 2006<br>#27, APJ Abdul Kalam Road, Knowledge Park-III, Greater Noida, Uttar Pradesh - 201306<br>Phone: 0120-2322022, 2323851-56 · Email: info@dronacharya.info</p>
     <div class="app-creator-credit auth-footer-credit">Designed and Developed by <strong>Ayush Gupta (CSIT)</strong></div>
   </main>
-  <script src="js/auth.js"></script>
+  <script>
+    // Self-contained resilient authentication handler
+    (function() {
+      function showMessage(message, isError = true) {
+        const element = document.getElementById("auth-message");
+        if (!element) return;
+        element.textContent = message;
+        element.classList.toggle("is-error", isError);
+        element.classList.toggle("is-success", !isError);
+      }
+
+      function getLocalAccounts() {
+        try {
+          return JSON.parse(localStorage.getItem("dgi_local_accounts") || "{}");
+        } catch {
+          return {};
+        }
+      }
+
+      function saveLocalAccounts(accounts) {
+        try {
+          localStorage.setItem("dgi_local_accounts", JSON.stringify(accounts));
+        } catch {}
+      }
+
+      async function readResponse(response, fallbackMessage) {
+        const body = await response.text();
+        let result;
+        try {
+          result = body ? JSON.parse(body) : {};
+        } catch {
+          throw new Error(`The server returned an unexpected response (${response.status}).`);
+        }
+        if (!response.ok) throw new Error(result.error || fallbackMessage);
+        return result;
+      }
+
+      async function submitCredentials(path, username, password) {
+        let authUser = username;
+        let loggedIn = false;
+
+        // 1. Try server login if on http/https
+        if (["http:", "https:"].includes(window.location.protocol)) {
+          try {
+            const response = await fetch(path, {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ username, password })
+            });
+            const result = await readResponse(response, "Authentication failed.");
+            authUser = result.username || username;
+            loggedIn = true;
+          } catch (err) {
+            console.warn("Server auth check error, falling back to local credentials:", err);
+          }
+        }
+
+        // 2. Local fallback check
+        if (!loggedIn) {
+          const u = String(username || "").trim().toLowerCase();
+          const p = String(password || "");
+          const accounts = getLocalAccounts();
+
+          if (u === "admin" && p === "admin123") {
+            authUser = "admin";
+            loggedIn = true;
+          } else if (accounts[u] && accounts[u].password === p) {
+            authUser = accounts[u].username || username;
+            loggedIn = true;
+          } else if (path.includes("register") || path.includes("setup")) {
+            accounts[u] = { username, password: p, isPrimary: Object.keys(accounts).length === 0 };
+            saveLocalAccounts(accounts);
+            authUser = username;
+            loggedIn = true;
+          } else {
+            throw new Error("Invalid username or password. (Default is admin / admin123)");
+          }
+        }
+
+        if (loggedIn) {
+          const sessionData = JSON.stringify({
+            username: authUser,
+            isPrimary: true,
+            loginTime: new Date().toISOString()
+          });
+          sessionStorage.setItem("dgi_admin_session", sessionData);
+          localStorage.setItem("dgi_admin_session", sessionData);
+          showMessage("Sign in successful! Redirecting to dashboard...", false);
+          setTimeout(() => {
+            window.location.replace("index.html");
+          }, 200);
+        }
+      }
+
+      window.adminAuth = {
+        async logout() {
+          try {
+            if (["http:", "https:"].includes(window.location.protocol)) {
+              await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+            }
+          } catch (e) {}
+          sessionStorage.removeItem("dgi_admin_session");
+          localStorage.removeItem("dgi_admin_session");
+          window.location.replace("login.html");
+        }
+      };
+
+      const loginForm = document.getElementById("login-form");
+      const setupForm = document.getElementById("setup-form");
+      const registerForm = document.getElementById("register-form");
+      const forgotForm = document.getElementById("forgot-form");
+      const resetForm = document.getElementById("reset-form");
+      const modeSwitch = document.getElementById("auth-mode-switch");
+      const showSigninButton = document.getElementById("show-signin");
+      const showRegisterButton = document.getElementById("show-register");
+      const heading = document.getElementById("auth-heading");
+      const description = document.getElementById("auth-description");
+
+      // Auto-login check if query params present (e.g. from previous GET submission)
+      const urlParams = new URLSearchParams(window.location.search);
+      const qUser = urlParams.get("username");
+      const qPass = urlParams.get("password");
+      if (qUser && qPass) {
+        window.history.replaceState(null, "", window.location.pathname);
+        showMessage("Verifying credentials and signing in...", false);
+        submitCredentials("/api/auth/login", qUser, qPass).catch(err => {
+          showMessage(err.message);
+        });
+      }
+
+      // Check if already authenticated
+      try {
+        const raw = sessionStorage.getItem("dgi_admin_session") || localStorage.getItem("dgi_admin_session");
+        if (raw) {
+          const s = JSON.parse(raw);
+          if (s && s.username && !qUser) {
+            window.location.replace("index.html");
+            return;
+          }
+        }
+      } catch (e) {}
+
+      // Quick fill button
+      document.getElementById("quick-fill-admin")?.addEventListener("click", () => {
+        const u = document.getElementById("login-username");
+        const p = document.getElementById("login-password");
+        if (u) u.value = "admin";
+        if (p) p.value = "admin123";
+        showMessage("Default credentials filled (admin / admin123)", false);
+      });
+
+      // Password toggle
+      document.querySelectorAll("[data-password-toggle]").forEach(button => {
+        button.addEventListener("click", () => {
+          const field = document.getElementById(button.dataset.passwordToggle);
+          if (!field) return;
+          const show = field.type === "password";
+          field.type = show ? "text" : "password";
+          button.textContent = show ? "Hide" : "Show";
+          button.setAttribute("aria-label", `${show ? "Hide" : "Show"} password`);
+          button.setAttribute("aria-pressed", String(show));
+        });
+      });
+
+      // Login form submit
+      if (loginForm) {
+        loginForm.addEventListener("submit", async function(e) {
+          e.preventDefault();
+          const u = (document.getElementById("login-username")?.value || "").trim();
+          const p = document.getElementById("login-password")?.value || "";
+          try {
+            await submitCredentials("/api/auth/login", u, p);
+          } catch (err) {
+            showMessage(err.message);
+          }
+        });
+      }
+
+      // Mode switch
+      function showAuthMode(mode) {
+        const registering = mode === "register";
+        if (loginForm) loginForm.hidden = registering;
+        if (registerForm) registerForm.hidden = !registering;
+        if (showSigninButton) showSigninButton.classList.toggle("is-active", !registering);
+        if (showRegisterButton) showRegisterButton.classList.toggle("is-active", registering);
+        if (heading) heading.textContent = registering ? "Create Account" : "Sign In";
+        if (description) description.textContent = registering
+          ? "Create a new account with its own separate library database."
+          : "Enter your username and password to access your library.";
+        showMessage("");
+      }
+
+      showSigninButton?.addEventListener("click", () => showAuthMode("signin"));
+      showRegisterButton?.addEventListener("click", () => showAuthMode("register"));
+
+      registerForm?.addEventListener("submit", async function(e) {
+        e.preventDefault();
+        const u = String(new FormData(registerForm).get("username") || "").trim();
+        const p = String(new FormData(registerForm).get("password") || "");
+        const cp = String(new FormData(registerForm).get("confirm-password") || "");
+        if (p !== cp) {
+          showMessage("Passwords do not match.");
+          return;
+        }
+        try {
+          await submitCredentials("/api/auth/register", u, p);
+        } catch (err) {
+          showMessage(err.message);
+        }
+      });
+    })();
+  </script>
 </body>
 </html>

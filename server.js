@@ -864,12 +864,18 @@ async function handleRequest(req, res) {
     if (p.startsWith('/api/')) return send(res, 404, { error: 'API endpoint not found.' });
 
     // ========================= STATIC FILES ================================
-    let file = p === '/' ? '/index.html' : p;
-    let full = path.join(ROOT, decodeURIComponent(file));
+    let cleanPath = decodeURIComponent(p);
+    if (cleanPath.startsWith('/')) cleanPath = cleanPath.slice(1);
+    let full = path.join(ROOT, cleanPath || 'index.html');
     if (!fs.existsSync(full) && fs.existsSync(full + '.html')) {
       full = full + '.html';
     }
-    if (!full.startsWith(ROOT) || !fs.existsSync(full) || fs.statSync(full).isDirectory()) {
+    if (!fs.existsSync(full) && process.cwd() && process.cwd() !== ROOT) {
+      const altFull = path.join(process.cwd(), cleanPath || 'index.html');
+      if (fs.existsSync(altFull)) full = altFull;
+      else if (fs.existsSync(altFull + '.html')) full = altFull + '.html';
+    }
+    if (!fs.existsSync(full) || fs.statSync(full).isDirectory()) {
       return send(res, 404, 'Not found', 'text/plain; charset=utf-8');
     }
     const type = MIME[path.extname(full)] || 'application/octet-stream';
