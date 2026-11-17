@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light" data-accent="dronacharya">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dronacharya Group of Institutions — Library Management System</title>
+  <meta name="description" content="Dronacharya Group of Institutions, Greater Noida — Library Management System with catalog, circulation, and WhatsApp notifications.">
+  <style>html.auth-pending body { visibility: hidden; }</style>
+  <script>
+    document.documentElement.classList.add("auth-pending");
+    window.adminSessionReady = (async function() {
+      if (["http:", "https:"].includes(window.location.protocol)) {
+        try {
+          const response = await fetch("/api/auth/status", { credentials: "same-origin" });
+          if (response.ok) {
+            const result = await response.json();
+            if (result.authenticated) {
+              window.adminDisplayName = result.username;
+              window.isPrimaryLibraryAccount = Boolean(result.isPrimaryAccount);
+              const sessionData = JSON.stringify({ username: result.username, isPrimary: Boolean(result.isPrimaryAccount) });
+              sessionStorage.setItem("dgi_admin_session", sessionData);
+              localStorage.setItem("dgi_admin_session", sessionData);
+              document.documentElement.classList.remove("auth-pending");
+              return true;
+            }
+          }
+        } catch (e) {
+          console.warn("Server auth check failed, checking local session:", e);
+        }
+      }
+      try {
+        const raw = sessionStorage.getItem("dgi_admin_session") || localStorage.getItem("dgi_admin_session");
+        if (raw) {
+          const session = JSON.parse(raw);
+          if (session && session.username) {
+            window.adminDisplayName = session.username;
+            window.isPrimaryLibraryAccount = session.isPrimary !== false;
+            document.documentElement.classList.remove("auth-pending");
+            return true;
+          }
+        }
+      } catch (e) {
+        console.warn("Local session check failed:", e);
+      }
+      window.location.replace("login.html");
+      return false;
+    })();
+  </script>
+  <link rel="icon" type="image/png" href="logo.png">
+  
+  <!-- CSS Design System -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- ======================================================================
+         SIDEBAR NAVIGATION
+         ====================================================================== -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="brand-wrapper">
+          <img class="brand-logo-icon" src="assets/logo-emblem.png" alt="Dronacharya Group of Institutions logo">
+          <div class="brand-info">
+            <span class="brand-title">DGI LMS</span>
+            <span class="brand-subtitle">Smart Library</span>
+          </div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-label">General</div>
+        <div class="nav-item active" data-view="dashboard">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">Dashboard</span>
+        </div>
+        <div class="nav-item" data-view="books">
+          <span class="nav-icon">📖</span>
+          <span class="nav-text">Books Catalog</span>
+        </div>
+        <div class="nav-item" data-view="students">
+          <span class="nav-icon">👥</span>
+          <span class="nav-text">Students</span>
+        </div>
+        <div class="nav-item" data-view="faculty">
+          <span class="nav-icon">👩‍🏫</span>
+          <span class="nav-text">Faculty</span>
+        </div>
+
+        <div class="nav-section-label">Circulation Desk</div>
+        <div class="nav-item" data-view="issue">
+          <span class="nav-icon">🔄</span>
+          <span class="nav-text">Issue Book</span>
+        </div>
+        <div class="nav-item" data-view="return">
+          <span class="nav-icon">📥</span>
+          <span class="nav-text">Return Desk</span>
+        </div>
+        <div class="nav-item" data-view="alerts">
+          <span class="nav-icon">🔔</span>
+          <span class="nav-text">Deadline Alerts</span>
+          <span class="nav-badge" id="nav-alert-badge" style="display: none;">0</span>
+        </div>
+
+        <div class="nav-section-label">Management</div>
+        <div class="nav-item" data-view="reports">
+          <span class="nav-icon">📈</span>
+          <span class="nav-text">Reports & Status</span>
+        </div>
+        <div class="nav-item" data-view="settings">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-text">Settings</span>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="admin-account-menu" id="admin-account-menu" hidden>
+          <div class="user-profile-badge">
+            <div class="user-meta">
+              <span class="user-meta-name" id="admin-display-name">DGI LIBRARY</span>
+              <span class="user-meta-role">Administrator</span>
+            </div>
+          </div>
+          <button class="admin-logout" type="button" onclick="window.adminAuth.logout()">↪ Sign out</button>
+        </div>
+        <div class="sidebar-footer-credit-row">
+          <button class="user-avatar admin-account-toggle" id="admin-account-toggle" type="button" aria-label="Open administrator options" aria-expanded="false" aria-controls="admin-account-menu">AD</button>
+          <div class="app-creator-credit">Designed and Developed by <strong>Prince Singh</strong></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ======================================================================
+         MAIN CONTENT AREA
+         ====================================================================== -->
+    <main class="main-content">
+      
+      <!-- Top Sticky Navigation Bar -->
+      <header class="topbar">
+        <div class="topbar-main-row">
+        <div class="topbar-left">
+          <button class="mobile-menu-btn" id="mobile-menu-btn" title="Toggle Menu">☰</button>
+          
+          <div class="topbar-college-brand">
+            <img src="assets/logo.png" alt="Dronacharya Group of Institutions logo">
+            <div class="topbar-college-copy">
+              <div class="topbar-college-name" id="topbar-college-name">DRONACHARYA GROUP OF INSTITUTIONS, GREATER NOIDA</div>
+              <div class="topbar-college-subtitle">(Affiliated to Dr. A.P.J. Abdul Kalam Technical University, Lucknow &amp; Approved by AICTE, New Delhi)</div>
+            </div>
+          </div>
+        </div>
+
+        </div>
+        <div class="topbar-accessibility-row">
+          <div class="header-datetime" id="header-datetime" aria-label="Current date and time">
+            <span id="header-date"></span>
+            <span class="header-datetime-separator" aria-hidden="true">·</span>
+            <span id="header-time"></span>
+          </div>
+          <div class="accessibility-toolbar" role="toolbar" aria-label="Display settings">
+            <button class="accessibility-toolbar-btn toolbar-alerts-btn" type="button" onclick="window.app.switchView('alerts')" title="View Overdue Alerts" aria-label="View overdue alerts">
+              <span aria-hidden="true">🔔</span><span class="topbar-badge" id="topbar-alert-dot" style="display: none;"></span>
+            </button>
+            <div class="accessibility-control-group college-font-controls" role="group" aria-label="College name font size">
+              <button class="accessibility-toolbar-btn college-font-btn" type="button" onclick="window.app.adjustCollegeFontSize(-1)" aria-label="Decrease college name font size" title="Decrease college name font size">
+                <span class="accessibility-control-icon" aria-hidden="true">A−</span>
+              </button>
+              <button class="accessibility-toolbar-btn college-font-btn" type="button" onclick="window.app.adjustCollegeFontSize(1)" aria-label="Increase college name font size" title="Increase college name font size">
+                <span class="accessibility-control-icon" aria-hidden="true">A+</span>
+              </button>
+            </div>
+            <div class="accessibility-control-group accent-picker" role="group" aria-label="Theme color">
+              <button class="accent-dot dronacharya" type="button" onclick="window.app.setAccent('dronacharya')" aria-label="Dronacharya college theme accent" title="Dronacharya college theme accent"></button>
+              <button class="accent-dot emerald" type="button" onclick="window.app.setAccent('emerald')" aria-label="Emerald green accent" title="Emerald green accent"></button>
+              <button class="accent-dot violet" type="button" onclick="window.app.setAccent('violet')" aria-label="Violet accent" title="Violet accent"></button>
+              <button class="accent-dot teal" type="button" onclick="window.app.setAccent('teal')" aria-label="Teal accent" title="Teal accent"></button>
+              <button class="accent-dot crimson" type="button" onclick="window.app.setAccent('crimson')" aria-label="Crimson red accent" title="Crimson red accent"></button>
+            </div>
+            <button class="accessibility-toolbar-btn theme-toolbar-btn" id="theme-toggle-btn" type="button" onclick="window.app.toggleTheme()" title="Switch to Dark Mode" aria-label="Switch to Dark Mode">
+              <span class="accessibility-control-icon" id="theme-toggle-icon" aria-hidden="true">🌙</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Pages View Container -->
+      <div class="page-container">
+
+        <!-- ==================================================================
+             VIEW 1: DASHBOARD
+             ================================================================== -->
+        <section class="page-view active" id="view-dashboard">
+          <div class="page-header">
+            <div class="page-title-group">
+              <h1>Library Overview & Operations</h1>
+              <p>Welcome back! Real-time telemetry, circulation tracking, and catalog insights.</p>
+            </div>
+            <div class="page-actions">
+              <button class="btn btn-primary btn-sm" onclick="window.app.switchView('issue')">⚡ Quick Issue</button>
+            </div>
+          </div>
+
+          <!-- Urgent Alert Banner -->
+          <div class="alert-banner" id="dashboard-alert-banner" style="display: none;">
+            <div class="alert-banner-left">
+              <div class="alert-banner-icon">⚠️</div>
+              <div>
+                <div class="alert-banner-title"><span id="banner-overdue-count">0</span> Overdue Book(s) Detected</div>
+                <div class="alert-banner-desc">Students and faculty have exceeded their allotted loan duration. Send reminders via WhatsApp or Email.</div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-whatsapp btn-sm" onclick="window.app.switchView('alerts')">
+                💬 View & Send WhatsApp Alerts
+              </button>
+            </div>
+          </div>
+
+          <!-- KPI Cards Grid -->
+          <div class="kpi-grid">
+              <div class="kpi-card" style="--card-accent: #510027;">
+                <div class="kpi-icon-wrap">📚</div>
+                <div class="kpi-content">
+                  <span class="kpi-label">Total Books</span>
+                  <span class="kpi-value" id="kpi-total-books">0</span>
+                  <span class="kpi-meta">Across all categories</span>
+                </div>
+              </div>
+
+              <div class="kpi-card" style="--card-accent: #7c2d12;">
+                <div class="kpi-icon-wrap">📖</div>
+                <div class="kpi-content">
+                  <span class="kpi-label">Book Titles</span>
+                  <span class="kpi-value" id="kpi-book-titles">0</span>
+                  <span class="kpi-meta">Catalog title entries</span>
+                </div>
+              </div>
+
+              <div class="kpi-card" style="--card-accent: #f59e0b;">
+              <div class="kpi-icon-wrap">🔄</div>
+              <div class="kpi-content">
+                <span class="kpi-label">Currently Issued</span>
+                <span class="kpi-value" id="kpi-issued-books">0</span>
+                <span class="kpi-meta">Active student loans</span>
+              </div>
+            </div>
+
+            <div class="kpi-card" style="--card-accent: #10b981;">
+              <div class="kpi-icon-wrap">✅</div>
+              <div class="kpi-content">
+                <span class="kpi-label">Available on Shelf</span>
+                <span class="kpi-value" id="kpi-available-books">0</span>
+                <span class="kpi-meta">Ready for checkout</span>
+              </div>
+            </div>
+
+            <div class="kpi-card" style="--card-accent: #a16207;">
+              <div class="kpi-icon-wrap">👥</div>
+              <div class="kpi-content">
+                <span class="kpi-label">Registered Students</span>
+                <span class="kpi-value" id="kpi-total-students">0</span>
+                <span class="kpi-meta">Active library members</span>
+              </div>
+            </div>
+
+            <div class="kpi-card" style="--card-accent: #ef4444;">
+              <div class="kpi-icon-wrap">🚨</div>
+              <div class="kpi-content">
+                <span class="kpi-label">Overdue Books</span>
+                <span class="kpi-value" id="kpi-overdue-count">0</span>
+                <span class="kpi-meta">Pending return</span>
+              </div>
+            </div>
+
+            <div class="kpi-card" style="--card-accent: #7c2d12;">
+              <div class="kpi-icon-wrap">💰</div>
+              <div class="kpi-content">
+                <span class="kpi-label">Fines Collected</span>
+                <span class="kpi-value" id="kpi-fines-collected">₹0</span>
+                <span class="kpi-meta">Total penalty revenue</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions Bar -->
+          <div class="quick-actions-bar">
+            <div class="quick-action-btn" onclick="window.app.switchView('issue')">
+              <div class="quick-action-icon">📤</div>
+              <div class="quick-action-text">
+                <span class="quick-action-title">Issue Book</span>
+                <span class="quick-action-sub">New loan transaction</span>
+              </div>
+            </div>
+
+            <div class="quick-action-btn" onclick="window.app.switchView('return')">
+              <div class="quick-action-icon">📥</div>
+              <div class="quick-action-text">
+                <span class="quick-action-title">Return Desk</span>
+                <span class="quick-action-sub">Check-in & fine collect</span>
+              </div>
+            </div>
+
+            <div class="quick-action-btn" onclick="window.app.openAddBookModal()">
+              <div class="quick-action-icon">➕</div>
+              <div class="quick-action-text">
+                <span class="quick-action-title">Add New Title</span>
+                <span class="quick-action-sub">Register book & ISBN</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Recent Activity Table -->
+          <div class="table-wrapper">
+            <div class="table-filter-bar">
+              <div class="card-title" style="font-size: 16px;">Recent Lending Transactions</div>
+              <button class="btn btn-secondary btn-sm" onclick="window.app.switchView('reports')">View All History →</button>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Transaction ID</th>
+                  <th>Book Title</th>
+                  <th>Student (Roll No)</th>
+                  <th>Issue Date</th>
+                  <th>Due Date</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="recent-transactions-tbody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+
+          <div class="table-wrapper" style="margin-top: 20px;">
+            <div class="table-filter-bar">
+              <div class="card-title" style="font-size: 16px;">Recent Book Reissues</div>
+              <button class="btn btn-secondary btn-sm" onclick="window.app.reviewRequestsOnDashboard()">Review Requests</button>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Approved</th>
+                  <th>Book Title</th>
+                  <th>Student (Roll No)</th>
+                  <th>Reissue</th>
+                  <th>Previous Due Date</th>
+                  <th>New Due Date</th>
+                  <th>Approved By</th>
+                </tr>
+              </thead>
+              <tbody id="dashboard-reissues-tbody">
+                <tr><td colspan="7" style="text-align:center; padding:24px;">No books have been reissued yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="table-wrapper" id="dashboard-reissue-requests" style="margin-top:20px;">
+            <div class="table-filter-bar"><div class="card-title" style="font-size:16px;">Reissue Requests to Review</div></div>
+            <table class="data-table">
+              <thead><tr><th>Student (Roll No)</th><th>Book Title</th><th>Due Date</th><th>Reissues</th><th>Requested</th><th>Action</th></tr></thead>
+              <tbody id="dashboard-reissue-requests-tbody"><tr><td colspan="6" style="text-align:center;padding:20px;">Loading requests...</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+
+
+        <!-- ==================================================================
+             VIEW 2: BOOKS CATALOG
+             ================================================================== -->
+        <section class="page-view" id="view-books">
+          <div class="page-header">
+            <div class="page-title-group">
+              <h1>Books Catalog</h1>
+              <p>Explore titles, manage stock copies, and issue books directly.</p>
+            </div>
+            <div class="page-actions">
+              <button class="btn btn-primary btn-sm" onclick="window.app.openAddBookModal()">+ Add New Book</button>
+            </div>
+          </div>
+
+          <!-- Filter Controls -->
+          <div class="table-wrapper" style="margin-bottom: 20px;">
+            <div class="table-filter-bar">
+              <div class="filter-left">
+                <div class="search-input-box">
+                  <span class="search-icon">🔍</span>
+                  <input type="text" id="books-search-input" placeholder="Search by title, author, publication, ISBN...">
+                </div>
+
+                <select class="select-filter" id="books-category-select">
+                  <option value="all">All Categories</option>
+                </select>
+
+                <select class="select-filter" id="books-branch-select" aria-label="Filter books by branch">
+                  <option value="all">All Branches</option>
+                </select>
+
+                <select class="select-filter" id="books-avail-select">
+                  <option value="all">All Availability</option>
+                  <option value="available">Available Now</option>
+                  <option value="out_of_stock">Checked Out (0 Avail)</option>
+                </select>
+              </div>
+
+              <div class="filter-right">
+                <button class="btn btn-secondary btn-sm" onclick="document.getElementById('books-import-input').click()">📤 Import Excel</button>
+                <input id="books-import-input" type="file" accept=".xlsx" hidden onchange="window.app.importBooksExcel(event)">
+                <button class="btn btn-secondary btn-sm" onclick="window.db.exportCSV('books')">📥 Export CSV</button>
+              </div>
+            </div>
+
+            <!-- Dynamic Category Pills -->
+            <div class="category-pills" id="books-category-pills"></div>
+          </div>
+
+          <div class="table-wrapper" id="books-table-view-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Book Details</th>
+                  <th>Author</th>
+                  <th>Branch</th>
+                  <th>Category</th>
+                  <th>ISBN / Accession</th>
+                  <th>Copies (Avail/Total)</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="books-table-tbody"></tbody>
+            </table>
+          </div>
+        </section>
+
+
+        <!-- ==================================================================
+             VIEW 3: STUDENTS DIRECTORY
+             ================================================================== -->
+        <section class="page-view" id="view-students">
+          <div class="page-header">
+            <div class="page-title-group">
+              <h1>Student Directory</h1>
+              <p>Manage registered members and contact details.</p>
+            </div>
+            <div class="page-actions">
+              <button class="btn btn-secondary btn-sm" onclick="window.db.exportCSV('students')">📥 Export CSV</button>
+              <button class="btn btn-primary btn-sm" onclick="window.app.openAddStudentModal()">+ Register Student</button>
+            </div>
+          </div>
+
+          <div class="table-wrapper">
+            <div class="table-filter-bar">
+              <div class="search-input-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="students-search-input" placeholder="Search by name, roll no, phone...">
+              </div>
+            </div>
+
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Student Name</th>
+                  <th>Roll Number</th>
+                  <th>Department</th>
+                  <th>Contact Phone</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="students-table-tbody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Faculty Directory -->
+        <section class="page-view" id="view-faculty">
+          <div class="page-header">
+            <div class="page-title-group">
+              <h1>Faculty Directory</h1>
+              <p>Manage faculty profiles and contact details.</p>
+            </div>
+            <div class="page-actions">
+              <button class="btn btn-secondary btn-sm" onclick="window.db.exportCSV('faculty')">📥 Export CSV</button>
+              <button class="btn btn-primary btn-sm" onclick="window.app.openAddFacultyModal()">+ Add Faculty</button>
+            </div>
+          </div>
+
+          <div class="table-wrapper">
+            <div class="table-filter-bar">
+              <div class="filter-left">
+                <div class="search-input-box">
+                  <span class="search-icon">🔍</span>
+                  <input type="text" id="faculty-search-input" placeholder="Search name, department, designation, phone...">
+                </div>
+                <select class="select-filter" id="faculty-department-filter" aria-label="Filter faculty by department">
+                  <option value="all">All Departments</option>
+                </select>
+                <select class="select-filter" id="faculty-sort-select" aria-label="Sort faculty">
+                  <option value="name-asc">Name (A-Z)</option>
+                  <option value="name-desc">Name (Z-A)</option>
+                  <option value="department">Department</option>
+                  <option value="designation">Designation</option>
+                  <option value="phone">Phone Number</option>
+                </select>
+              </div>
+            </div>
+
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Faculty ID</th>
+                  <th>Faculty Name</th>
+                  <th>Designation</th>
+                  <th>Department</th>
+                  <th>Phone Number</th>
+                  <th>Email ID</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="faculty-table-tbody"></tbody>
+            </table>
+          </div>
+        </section>
+
+
+        <!-- ==================================================================
+             VIEW 4: ISSUE BOOK DESK
+             ================================================================== -->
+        <section class="page-view" id="view-issue">
+          <div class="page-header">
+            <div class="page-title-group">
+              <h1>Book Circulation Desk — Issue</h1>
+              <p>Issue books to students or faculty and generate printable issue slips.</p>
+            </div>
+            <div class="page-actions">
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 3fr 2fr; gap: 24px;">
+            <div class="table-wrapper" style="padding: 28px;">
+              <form id="issue-book-form">
+                <div class="form-group">
+                  <label for="issue-book-select">Select Book Title *</label>
+                  <input class="form-control" id="issue-book-search" list="issue-book-options" placeholder="Search title, accession no., ISBN, author, or category…" autocomplete="off" aria-label="Search available books">
+                  <datalist id="issue-book-options"></datalist>
+                  <select class="form-control" id="issue-book-select" required style="display:none"></select>
+                  <div id="issue-selected-book-info" class="issue-selected-book-info" style="display:none"></div>
+                </div>
+
+                <div class="form-group">
+                  <label for="issue-borrower-type">Issue to *</label>
+                  <select class="form-control" id="issue-borrower-type">
+                    <option value="student">Student</option><option value="faculty">Faculty</option>
+                  </select>
+                </div>
+
+                <div id="issue-student-container" class="form-group" style="margin-bottom: 20px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                    <label style="margin-bottom: 0; font-weight: 600;">Student for Book Issue *</label>
+                    <div class="issue-student-mode-toggle" role="group" aria-label="Student Selection Mode">
+                      <button type="button" class="btn btn-sm btn-primary" id="btn-issue-mode-existing" onclick="window.app.setIssueStudentMode('existing')">
+                        👥 Select Registered
+                      </button>
+                      <button type="button" class="btn btn-sm btn-secondary" id="btn-issue-mode-new" onclick="window.app.setIssueStudentMode('new')">
+                        ➕ Register New Student
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Mode 1: Select Registered Student using a single searchable dropdown -->
+                  <div id="issue-existing-student-container">
+                    <div class="issue-student-controls">
+                      <input type="text" class="form-control" id="issue-student-search" list="issue-student-options" placeholder="Select registered student..." autocomplete="off" aria-label="Select registered student">
+                      <datalist id="issue-student-options"></datalist>
+                      <select class="form-control" id="issue-student-select" style="display: none;">
+                        <option value="">-- Select Registered Student --</option>
+                      </select>
+                    </div>
+                    <div id="issue-selected-student-info" style="display: none; margin-top: 10px; padding: 10px 14px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 12.5px; color: var(--text-secondary);">
+                    </div>
+                  </div>
+
+                  <!-- Mode 2: Inline Register New Student (with automatic lookup & auto-fill) -->
+                  <div id="issue-new-student-container" class="issue-inline-register-box" style="display: none;">
+                    <div class="issue-inline-header">
+                      <div class="issue-inline-title">
+                        <span>📝</span> Student Registration Desk
+                      </div>
+                      <span class="badge badge-info" id="issue-inline-badge">Live Roll No. Lookup</span>
+                    </div>
+
+                    <!-- Auto-match notice banner when student is already registered -->
+                    <div class="student-existing-match" id="issue-inline-match-notice" style="display: none;" role="status" aria-live="polite"></div>
+
+                    <div class="form-row">
+                      <div class="form-group" style="margin-bottom: 12px;">
+                        <label for="issue-inline-roll">Roll Number *</label>
+                        <input type="text" class="form-control" id="issue-inline-roll" autocomplete="off">
+                      </div>
+                      <div class="form-group" style="margin-bottom: 12px;">
+                        <label for="issue-inline-name">Student Full Name *</label>
+                        <input type="text" class="form-control" id="issue-inline-name">
+                      </div>
+                    </div>
+
+                    <div class="form-row">
+                      <div class="form-group" style="margin-bottom: 12px;">
+                        <label for="issue-inline-dept">Department</label>
+                        <input type="text" class="form-control" id="issue-inline-dept">
+                      </div>
+                      <div class="form-group" style="margin-bottom: 12px;">
+                        <label for="issue-inline-phone">Phone Number *</label>
+                        <input type="tel" class="form-control" id="issue-inline-phone" value="+91">
+                      </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                      <label for="issue-inline-email">Email Address *</label>
+                      <input type="email" class="form-control" id="issue-inline-email">
+                    </div>
+                  </div>
+                </div>
+
+                <div id="issue-faculty-container" class="form-group" style="display:none; margin-bottom:20px;">
+                  <label for="issue-faculty-search">Faculty member *</label>
+                  <input type="text" class="form-control" id="issue-faculty-search" list="issue-faculty-options" placeholder="Search by faculty ID or name…" autocomplete="off">
+                  <datalist id="issue-faculty-options"></datalist>
+                  <div id="issue-selected-faculty-info" class="issue-selected-book-info" style="display:none"></div>
+                </div>
+
+                <div class="form-group">
+                  <label for="issue-date">Issue Date *</label>
+                  <input type="date" class="form-control" id="issue-date" required>
+                </div>
+
+                <div class="form-group">
+                  <label for="issue-loan-period">Return Period *</label>
+                  <select class="form-control" id="issue-loan-period" required>
+                    <option value="7" selected>7 days</option>
+                    <option value="14">14 days</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="issue-due-date">Due Date for Return *</label>
+                  <input type="date" class="form-control" id="issue-due-date" required>
+                  <small style="color: var(--text-muted);">Due date is calculated from the issue date and return period. You can adjust it if needed.</small>
+                </div>
+
+                <div class="form-group">
+                  <label for="issue-remarks">Notes / Remarks</label>
+                  <input type="text" class="form-control" id="issue-remarks" placeholder="Optional notes (e.g. Semester project reference)">
+                </div>
+
+                <div style="margin-top: 24px; display: flex; justify-content: flex-end;">
+                  <button type="submit" class="btn btn-primary" style="padding: 12px 28px;">
+                    ✅ Confirm & Issue Book
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Guidelines Card -->
+            <div class="chart-card" style="justify-content: flex-start;">
+              <div id="issue-student-behaviour-panel" style="display:none; width:100%; margin-bottom:20px;"></div>
+              <div class="card-title" style="margin-bottom: 12px;">Circulation Guidelines</div>
+              <ul style="color: var(--text-secondary); font-size: 13.5px; line-height: 1.8; padding-left: 20px;">
+                <li>Each student can hold a maximum of <strong>4 books</strong> simultaneously.</li>
+                <li>Choose a 7-day or 14-day return period; the due date is calculated automatically.</li>
+                <li>Late penalty accrues at <strong>₹5.00 per day</strong> past the designated return deadline.</li>
+                <li>Choose WhatsApp or Email on the issue receipt to prepare the book issue message.</li>
+                <li>Upon issuing, an official thermal receipt slip is generated with transaction details.</li>
+              </ul>
+
+              <div style="margin-top: 24px; padding: 16px; background: var(--accent-glow-subtle); border: 1px solid var(--border-highlight); border-radius: var(--radius-sm);">
+                <div style="font-weight: 700; color: var(--accent-primary); font-size: 13px;">💡 Quick Scanner Tip</div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Use the ISBN / QR scanner in Add Book to fill book details from a book code.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- ==================================================================
+             VIEW 5: RETURN DESK
+             ================================================================== -->
+        <section class="page-view" id="view-return">
+          <div class="page-header">
+            <div class="page-title-group">
+              <h1>Book Return Desk & Fine Settlement</h1>
+              <p>Process returned books, automatically calculate late fines, waive or collect payment.</p>
+            </div>
+            <div class="page-actions">
+            </div>
+          </div>
+
+          <div class="table-wrapper">
+            <div class="table-filter-bar">
+              <div class="search-input-box" style="width: 340px;">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="return-search-input" placeholder="Type Title, Student Roll No, or ISBN...">
+              </div>
+            </div>
+
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Transaction</th>
+                  <th>Book Title</th>
+                  <th>Student Info</th>
+                  <th>Issue Date</th>
+                  <th>Due Date</th>
+                  <th>Status & Late Days</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="return-table-tbody"></tbody>
+            </table>
+          </div>
+
+          <div class="table-wrapper" style="margin-top:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:18px 20px;border-bottom:1px solid var(--border-color);"><h3 style="margin:0;">Faculty Circulation History</h3><span style="color:var(--text-muted);font-size:13px;">Separate faculty issue and return records</span></div>
+            <table class="data-table">
+              <thead><tr><th>Faculty Loan</th><th>Book</th><th>Faculty</th><th>Issue Date</th><th>Due Date</th><th>Return Date</th><th>Status</th></tr></thead>
+              <tbody id="faculty-circulation-history-tbody"></tbody>
+            </table>
+          </div>
+        </section>
+
+
+        <!-- ==================================================================
+             VIEW 6: DEADLINE ALERTS & NOTIFIER
+             ================================================================== -->
+        <section class="page-view" id="view-alerts">
+          <div class="page-header">
+            <div class="page-title-group">
+              <h1>Deadline Alerts & Borrower Notifier</h1>
+              <p>Send direct WhatsApp reminders and Email notices to students and faculty.</p>
+            </div>
+            <div class="page-actions">
+              <button class="btn btn-danger btn-sm" onclick="window.app.blastAllOverdueAlerts()">
+                ⚡ Blast Alerts to All Overdue Borrowers
+              </button>
+            </div>
+          </div>
+
+          <!-- Alert Tabs -->
+          <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+            <button class="btn btn-primary" id="btn-tab-overdue" onclick="window.app.setAlertTab('overdue')">
+              🔴 Overdue (<span id="alerts-overdue-count">0</span>)
+            </button>
+            <button class="btn btn-secondary" id="btn-tab-duesoon" onclick="window.app.setAlertTab('dueSoon')">
+              🟡 Due Soon (<span id="alerts-duesoon-count">0</span>)
+            </button>
+          </div>
+
+          <div id="alerts-list-container"></div>
+        </section>
+
+
+        <!-- ==================================================================
+             VIEW 7: REPORTS & ANALYTICS
+             ================================================================== -->
+        <section class="page-view" id="view-reports">
+          <div class="page-header">
+            <div class="page-title-group">
+              <h1>Reports & Library Intelligence</h1>
+              <p>Audit catalog history, export data to Excel/CSV, and view reader leaderboards.</p>
+            </div>
+            <div class="page-actions">
+              <button class="btn btn-secondary btn-sm" onclick="window.db.exportCSV('books')">📥 Books CSV</button>
+              <button class="btn btn-secondary btn-sm" onclick="window.db.exportCSV('students')">📥 Students CSV</button>
+              <button class="btn btn-primary btn-sm" onclick="window.db.exportCSV('transactions')">📥 Transactions CSV</button>
+            </div>
+          </div>
+
+          <div class="reports-leaderboards">
+            <div class="table-wrapper reports-books-table">
+              <div class="table-filter-bar">
+                <div class="card-title" style="font-size: 15px;">🏆 Most Borrowed Books</div>
+              </div>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Rank</th>
+                    <th>Book Title</th>
+                    <th>Author</th>
+                    <th>Checkouts</th>
+                  </tr>
+                </thead>
+                <tbody id="reports-top-books-tbody"></tbody>
+              </table>
+            </div>
+
+            <div class="table-wrapper reports-readers-table">
+              <div class="table-filter-bar">
+                <div class="card-title" style="font-size: 15px;">🌟 Avid Readers Leaderboard</div>
+              </div>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Rank</th>
+                    <th>Student Name</th>
+                    <th>Roll No</th>
+                    <th>Department</th>
+                    <th>Books Read</th>
+                  </tr>
+                </thead>
+                <tbody id="reports-top-students-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="table-wrapper report-history-wrapper" style="margin-top:24px;">
+            <summary class="table-filter-bar report-history-summary">
+              <span class="card-title" style="font-size:15px;">Student Reissue Requests</span>
+              <span class="report-history-toggle">Show / Hide</span>
+            </summary>
+            <div class="table-filter-bar">
+              <div class="filter-left">
+                <div class="search-input-box">
+                  <span class="search-icon">⌕</span>
+                  <input id="reissue-history-search" type="search" placeholder="Search student name or roll no" aria-label="Search reissue request history by student name or roll number">
+                </div>
+                <select id="reissue-history-status" class="form-control" aria-label="Filter reissue request history by status" style="max-width:170px;">
+                  <option value="all">All statuses</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="expired">Expired</option>
+                </select>
+              </div>
+              <button class="btn btn-secondary btn-sm" type="button" onclick="window.app.renderReissueRequests()">Refresh</button>
+            </div>
+            <table class="data-table">
+              <thead><tr><th>Student (Roll No)</th><th>Book Title</th><th>Due Date</th><th>Reissues</th><th>Requested</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody id="reports-reissue-requests-tbody"><tr><td colspan="7" style="text-align:center;padding:20px;">Open Reports to load reissue request history.</td></tr></tbody>
+            </table>
+          </details>
+
+          <div class="table-wrapper report-history-wrapper">
+            <details class="report-history-dropdown">
+              <summary class="table-filter-bar report-history-summary">
+                <span class="card-title" style="font-size: 15px;">Circulation History</span>
+                <span class="report-history-toggle">Show / Hide</span>
+              </summary>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Transaction</th>
+                    <th>Book Title</th>
+                    <th>Student</th>
+                    <th>Issue Date</th>
+                    <th>Due Date</th>
+                    <th>Return Date</th>
+                    <th>Fine</th>
+                    <th>Payment</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="reports-transactions-tbody"></tbody>
+              </table>
+            </details>
+          </div>
+
+          <details class="table-wrapper report-history-wrapper" style="margin-top: 24px;">
+            <summary class="table-filter-bar report-history-summary">
+              <span class="card-title" id="message-history-title" style="font-size: 15px;">Student &amp; Faculty Message &amp; Reply History</span>
+              <span class="report-history-toggle">Show / Hide</span>
+            </summary>
+            <div class="table-filter-bar">
+              <div class="filter-left">
+                <div class="search-input-box">
+                  <span class="search-icon">⌕</span>
+                  <input id="message-history-search" type="search" placeholder="Search name, roll no, or faculty ID" aria-label="Search message history by name, roll number, or faculty ID">
+                </div>
+                <select id="message-history-channel" class="form-control" aria-label="Filter message history by channel" style="max-width: 170px;">
+                  <option value="all">All channels</option>
+                  <option value="email">Email</option>
+                  <option value="whatsapp">WhatsApp</option>
+                </select>
+                <select id="message-history-borrower" class="form-control" aria-label="Filter message history by borrower" style="max-width: 170px;">
+                  <option value="all">All borrowers</option>
+                  <option value="student">Students</option>
+                  <option value="faculty">Faculty</option>
+                </select>
+              </div>
+              <div class="filter-left">
+                <button id="message-history-delete-failed" class="btn btn-danger btn-sm" type="button" onclick="window.app.deleteAllFailedMessages()" hidden>Delete all failed messages</button>
+                <button class="btn btn-secondary btn-sm" type="button" onclick="window.app.renderMessageHistory()">Refresh</button>
+              </div>
+              <div class="message-history-sync-status" id="email-reply-sync-status" role="status" aria-live="polite" hidden></div>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date &amp; Time</th>
+                  <th>Student / Faculty</th>
+                  <th>Channel</th>
+                  <th>Message Sent</th>
+                  <th>Student Response</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="reports-message-history-tbody">
+                <tr><td colspan="6" style="text-align:center; padding:24px;">Open Reports to load message history.</td></tr>
+              </tbody>
+            </table>
+            <div class="table-filter-bar" id="message-history-pagination" style="justify-content:space-between;align-items:center;gap:10px;">
+              <span id="message-history-page-label" style="color:var(--text-muted);font-size:13px;">Page 1 of 1</span>
+              <div style="display:flex;gap:8px;">
+                <button class="btn btn-secondary btn-sm" id="message-history-prev" type="button">Previous</button>
+                <button class="btn btn-secondary btn-sm" id="message-history-next" type="button">Next</button>
+              </div>
+            </div>
+          </details>
+        </section>
+
+
+        <!-- ==================================================================
+             VIEW 8: SETTINGS
+             ================================================================== -->
+        <section class="page-view" id="view-settings">
+          <div class="page-header">
+            <div class="page-title-group">
+              <h1>System Settings & Administration</h1>
+              <p>Configure fines, alert thresholds, database backup/restore, and sample data.</p>
+            </div>
+          </div>
+
+          <div class="settings-layout">
+            <div class="table-wrapper settings-panel" style="padding: 26px;">
+              <h3 style="margin-bottom: 16px;">Circulation Rules</h3>
+              <form id="form-settings">
+                <div class="form-group">
+                  <label for="setting-lib-name">Library Name</label>
+                  <input type="text" class="form-control" id="setting-lib-name" required>
+                </div>
+
+                <div class="form-group">
+                  <label for="setting-fine-rate">Daily Fine Rate (₹ / Day)</label>
+                  <input type="number" step="0.5" class="form-control" id="setting-fine-rate" required>
+                </div>
+
+                <div class="form-group">
+                  <label for="setting-alert-days">Alert Threshold (Days before due date)</label>
+                  <input type="number" class="form-control" id="setting-alert-days" required>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="margin-top: 10px;">💾 Save Configurations</button>
+              </form>
+            </div>
+
+            <div class="table-wrapper settings-panel database-storage-panel" style="padding: 26px;">
+              <h3 style="margin-bottom: 16px;">Database & Storage</h3>
+              <p class="database-storage-description">
+                All library records are persisted locally. You can download a complete JSON backup or restore from one anytime.
+              </p>
+
+              <div class="database-storage-actions">
+                <button class="btn btn-secondary" onclick="window.app.downloadJSONBackup()">
+                  💾 Download Database JSON Backup
+                </button>
+
+                <label class="btn btn-secondary" style="cursor: pointer;">
+                  📂 Restore Database from JSON File
+                  <input type="file" accept=".json" style="display: none;" onchange="window.app.importJSONBackup(event)">
+                </label>
+
+                <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 8px 0;">
+
+                <button class="btn btn-primary" onclick="window.app.restoreScreenshotRecords()">
+                  📥 Restore Screenshot Records (8 Students, 10 Books, 11 Transactions)
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="table-wrapper account-security-card" style="padding:26px;margin-top:24px;max-width:720px;">
+            <h3 style="margin-bottom:8px;">Account Security</h3>
+            <p style="color:var(--text-secondary);font-size:13.5px;margin-bottom:18px;">Select an account option to open its form.</p>
+            <div class="account-security-options" role="group" aria-label="Account security options">
+              <button class="btn btn-secondary" type="button" aria-expanded="false" aria-controls="security-password-panel" onclick="window.app.toggleSecurityForm('password')">Change Password</button>
+              <button class="btn btn-secondary" type="button" aria-expanded="false" aria-controls="security-username-panel" onclick="window.app.toggleSecurityForm('username')">Change Username</button>
+            </div>
+            <div id="security-password-panel" hidden>
+              <p style="color:var(--text-secondary);font-size:13px;margin:16px 0;">Use a unique password with at least 8 characters. Updating it signs out all active sessions.</p>
+              <form id="form-change-password">
+              <div class="form-group">
+                <label for="security-current-password">Current password</label>
+                <input type="password" class="form-control" id="security-current-password" autocomplete="current-password" maxlength="128" required>
+              </div>
+              <div class="form-group">
+                <label for="security-new-password">New password</label>
+                <input type="password" class="form-control" id="security-new-password" autocomplete="new-password" minlength="8" maxlength="128" required>
+              </div>
+              <div class="form-group">
+                <label for="security-confirm-password">Confirm new password</label>
+                <input type="password" class="form-control" id="security-confirm-password" autocomplete="new-password" minlength="8" maxlength="128" required>
+              </div>
+              <button type="submit" class="btn btn-primary">Update Password</button>
+              </form>
+            </div>
+            <div id="security-username-panel" hidden>
+              <p style="color:var(--text-secondary);font-size:13px;margin:16px 0;">Verify your current password to choose a new username.</p>
+              <form id="form-change-username">
+              <div class="form-group">
+                <label for="security-username-current-password">Current password</label>
+                <input type="password" class="form-control" id="security-username-current-password" autocomplete="current-password" maxlength="128" required>
+              </div>
+              <div class="form-group">
+                <label for="security-new-username">New username</label>
+                <input type="text" class="form-control" id="security-new-username" placeholder="Enter a new username" autocomplete="off" autocapitalize="off" spellcheck="false" minlength="3" maxlength="40" pattern="[A-Za-z0-9_.@ -]{3,40}" required>
+              </div>
+              <button type="submit" class="btn btn-secondary">Update Username</button>
+              </form>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+
+  <!-- ========================================================================
+       MODALS
+       ======================================================================== -->
+
+  <!-- 1. Add / Edit Book Modal -->
+  <div class="modal-backdrop" id="modal-book">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-book-title">Add New Book</div>
+        <button class="modal-close-btn" onclick="window.app.closeModal('modal-book')">✕</button>
+      </div>
+      <form id="form-book">
+        <div class="modal-body">
+          <input type="hidden" id="book-modal-id">
+          <div class="form-group">
+            <label for="book-modal-title-input">Book Title *</label>
+            <input type="text" class="form-control" id="book-modal-title-input" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="book-modal-author">Author *</label>
+              <input type="text" class="form-control" id="book-modal-author" required>
+            </div>
+            <div class="form-group">
+              <label for="book-modal-isbn">ISBN / Barcode *</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" class="form-control" id="book-modal-isbn" required>
+                <button type="button" class="btn btn-secondary" onclick="window.app.openBookEntryScanner()" title="Scan ISBN barcode or book QR code">📷 Scan ISBN / QR</button>
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="book-modal-publisher">Publication / Publisher</label>
+            <input type="text" class="form-control" id="book-modal-publisher" maxlength="200" placeholder="Enter publication or publisher name">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="book-modal-category">Category / Genre</label>
+              <input type="text" class="form-control" id="book-modal-category" list="book-category-options" placeholder="Enter book category" required>
+              <datalist id="book-category-options"></datalist>
+            </div>
+            <div class="form-group">
+              <label for="book-modal-qty">Total Quantity *</label>
+              <input type="number" min="1" class="form-control" id="book-modal-qty" value="3" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="book-modal-desc">Synopsis / Description</label>
+            <textarea class="form-control" id="book-modal-desc" rows="3" placeholder="Brief summary of the book..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="window.app.closeModal('modal-book')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Book</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. Add / Edit Student Modal -->
+  <div class="modal-backdrop" id="modal-student">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-student-title">Register Student</div>
+        <button class="modal-close-btn" onclick="window.app.closeModal('modal-student')">✕</button>
+      </div>
+      <form id="form-student">
+        <div class="modal-body">
+          <input type="hidden" id="student-modal-id">
+          <div class="student-existing-match" id="student-existing-match" style="display: none;" role="status" aria-live="polite"></div>
+          <div class="form-group">
+            <label for="student-modal-name">Student Full Name *</label>
+            <input type="text" class="form-control" id="student-modal-name" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="student-modal-roll">Roll Number *</label>
+              <input type="text" class="form-control" id="student-modal-roll" required>
+            </div>
+            <div class="form-group">
+              <label for="student-modal-dept">Department</label>
+              <input type="text" class="form-control" id="student-modal-dept">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="student-modal-email">Email Address *</label>
+              <input type="email" class="form-control" id="student-modal-email" required>
+            </div>
+            <div class="form-group">
+              <label for="student-modal-phone">Phone Number *</label>
+              <input type="tel" class="form-control" id="student-modal-phone" value="+91" required>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="window.app.closeModal('modal-student')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Student</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add / Edit Faculty Modal -->
+  <div class="modal-backdrop" id="modal-faculty">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-faculty-title">Add Faculty</div>
+        <button class="modal-close-btn" type="button" onclick="window.app.closeModal('modal-faculty')">✕</button>
+      </div>
+      <form id="form-faculty">
+        <div class="modal-body">
+          <input type="hidden" id="faculty-modal-id">
+          <div class="form-group">
+            <label for="faculty-modal-faculty-id">Faculty ID</label>
+            <input type="text" class="form-control" id="faculty-modal-faculty-id" maxlength="40">
+          </div>
+          <div class="form-group">
+            <label for="faculty-modal-name">Faculty Name *</label>
+            <input type="text" class="form-control" id="faculty-modal-name" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="faculty-modal-designation">Designation *</label>
+              <input type="text" class="form-control" id="faculty-modal-designation" required>
+            </div>
+            <div class="form-group">
+              <label for="faculty-modal-department">Department *</label>
+              <input type="text" class="form-control" id="faculty-modal-department" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="faculty-modal-phone">Phone Number *</label>
+              <input type="tel" class="form-control" id="faculty-modal-phone" autocomplete="tel" required>
+            </div>
+            <div class="form-group">
+              <label for="faculty-modal-email">Email ID *</label>
+              <input type="email" class="form-control" id="faculty-modal-email" autocomplete="email" required>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="window.app.closeModal('modal-faculty')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Faculty</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 3. Book Entry QR / ISBN Scanner Modal -->
+  <div class="modal-backdrop" id="modal-scanner">
+    <div class="modal-card" style="max-width: 520px;">
+      <div class="modal-header">
+        <div class="modal-title">Scan ISBN / Book QR for Entry</div>
+        <button class="modal-close-btn" onclick="window.app.closeScannerModal()">✕</button>
+      </div>
+      <div class="modal-body" style="text-align: center;">
+        <div style="position: relative; width: 100%; height: 260px; background: #000; border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 16px;">
+          <video id="scanner-video" style="width: 100%; height: 100%; object-fit: cover;"></video>
+          <!-- Reticle Overlay -->
+          <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 180px; height: 180px; border: 2px dashed var(--accent-primary); border-radius: 12px; pointer-events: none; box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);"></div>
+        </div>
+
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
+          Scan a book's ISBN barcode or QR code to fill the book entry form.
+        </p>
+
+        <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 16px;">
+          <label class="btn btn-secondary btn-sm" style="cursor: pointer;">
+            📁 Upload Image to Scan
+            <input type="file" accept="image/*" style="display: none;" onchange="window.app.handleScannerFileUpload(event)">
+          </label>
+        </div>
+
+        <div style="border-top: 1px solid var(--border-color); padding-top: 14px;">
+          <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Or enter the ISBN manually:</div>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" class="form-control" id="scanner-manual-input" placeholder="Enter ISBN...">
+            <button class="btn btn-primary btn-sm" onclick="window.app.submitManualScan()">Go</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="window.app.closeScannerModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Process Return Modal (Fine calculation & payment) -->
+  <div class="modal-backdrop" id="modal-process-return">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">Process Book Return</div>
+        <button class="modal-close-btn" onclick="window.app.closeModal('modal-process-return')">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="return-tx-id">
+        <div style="background: var(--bg-secondary); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-bottom: 18px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+            <span style="color: var(--text-muted); font-size: 13px;">Book Title:</span>
+            <strong id="return-modal-book-title" style="color: var(--text-primary);"></strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+            <span style="color: var(--text-muted); font-size: 13px;">Student:</span>
+            <strong id="return-modal-student" style="color: var(--text-primary);"></strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+            <span style="color: var(--text-muted); font-size: 13px;">Scheduled Due Date:</span>
+            <span id="return-modal-due-date" style="font-family: var(--font-mono);"></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+            <span style="color: var(--text-muted); font-size: 13px;">Days Overdue:</span>
+            <span id="return-modal-days-late" style="color: var(--danger); font-weight: 700;"></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px dashed var(--border-color);">
+            <span style="font-weight: 700; color: var(--text-primary);">Accrued Fine:</span>
+            <strong id="return-modal-fine-amount" style="font-size: 18px; color: var(--danger);"></strong>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="return-fine-action">Fine Settlement Decision *</label>
+          <select class="form-control" id="return-fine-action">
+            <option value="none">No Fine / On Time</option>
+            <option value="paid">Collect Fine</option>
+            <option value="waived">Waive Fine (Librarian Discretion)</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="return-payment-method-group" style="display: none;">
+          <label for="return-payment-method">Payment Method *</label>
+          <select class="form-control" id="return-payment-method">
+            <option value="">-- Select Payment Method --</option>
+            <option value="cash">Cash</option>
+            <option value="upi">UPI</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="return-modal-remarks">Return Condition Remarks</label>
+          <input type="text" class="form-control" id="return-modal-remarks" placeholder="Book in good condition, no damages...">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="window.app.closeModal('modal-process-return')">Cancel</button>
+        <button class="btn btn-success" onclick="window.app.submitProcessReturn()">Confirm Check-in</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. Printable Issue Thermal Slip Modal -->
+  <div class="modal-backdrop" id="modal-issue-slip">
+    <div class="modal-card" style="max-width: 380px; background: transparent; border: none; box-shadow: none;">
+      <div class="receipt-slip">
+        <div class="receipt-header">
+          <div class="receipt-title" id="slip-lib-name">DGI Central Library</div>
+          <div style="font-size: 10px; color: #6b3049; margin-top: 2px;">Official Book Circulation Slip</div>
+        </div>
+
+        <div class="receipt-row">
+          <span>Transaction:</span>
+          <strong id="slip-tx-id">#TX-0</strong>
+        </div>
+        <div class="receipt-row">
+          <span>Date Issued:</span>
+          <span id="slip-issue-date">YYYY-MM-DD</span>
+        </div>
+        <div class="receipt-row" style="color: #b91c1c; font-weight: 700;">
+          <span>Return Due:</span>
+          <span id="slip-due-date">YYYY-MM-DD</span>
+        </div>
+
+        <div class="receipt-divider"></div>
+
+        <div class="receipt-row">
+          <span>Book Title:</span>
+          <strong id="slip-book-title">Title</strong>
+        </div>
+        <div class="receipt-row">
+          <span>ISBN:</span>
+          <span id="slip-book-isbn">ISBN</span>
+        </div>
+        <div class="receipt-row">
+          <span>Student:</span>
+          <strong id="slip-student-name">Student</strong>
+        </div>
+        <div class="receipt-row">
+          <span>Roll No:</span>
+          <span id="slip-student-roll">CS101</span>
+        </div>
+
+        <div class="receipt-divider"></div>
+
+        <div style="font-size: 10px; color: #6b3049; text-align: center; line-height: 1.4;">
+          Library Rules: Maximum 4 books allowed per student. Late returns are charged ₹5.00/day past due date.
+        </div>
+
+        <div class="receipt-stamp">ISSUED & VERIFIED</div>
+      </div>
+
+      <div class="issue-notice" id="issue-notice" style="display: none;">
+        <span aria-hidden="true" style="font-size: 18px;">📲</span>
+        <div>
+          <strong id="issue-notice-title">Choose a Message Channel</strong>
+          <span id="issue-notice-recipient" style="display: block; font-size: 12px; margin-top: 2px;"></span>
+        </div>
+      </div>
+
+      <div class="issue-notice-actions" style="display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 16px;">
+        <button class="btn btn-secondary btn-sm" onclick="window.app.closeModal('modal-issue-slip')">Close</button>
+        <button class="btn btn-secondary btn-sm" id="btn-copy-issue-msg" onclick="window.app.copyCurrentIssueMessage()">📋 Copy Message</button>
+        <a class="btn btn-whatsapp btn-sm" id="issue-whatsapp-link" href="#" target="_blank" rel="noopener">💬 WhatsApp Student</a>
+        <button class="btn btn-primary btn-sm" onclick="window.app.printCurrentSlip()">🖨️ Print Slip</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. Printable Return Clearance Slip Modal -->
+  <div class="modal-backdrop" id="modal-return-slip">
+    <div class="modal-card" style="max-width: 380px; background: transparent; border: none; box-shadow: none;">
+      <div class="receipt-slip">
+        <div class="receipt-header">
+          <div class="receipt-title" id="ret-slip-lib-name">DGI Central Library</div>
+          <div style="font-size: 10px; color: #059669; font-weight: 700; margin-top: 2px;">RETURN & CLEARANCE CERTIFICATE</div>
+        </div>
+
+        <div class="receipt-row">
+          <span>Transaction Ref:</span>
+          <strong id="ret-slip-tx-id">#TX-0</strong>
+        </div>
+        <div class="receipt-row">
+          <span>Return Date:</span>
+          <span id="ret-slip-return-date">YYYY-MM-DD</span>
+        </div>
+
+        <div class="receipt-divider"></div>
+
+        <div class="receipt-row">
+          <span>Returned Book:</span>
+          <strong id="ret-slip-book-title">Title</strong>
+        </div>
+        <div class="receipt-row">
+          <span>Borrower:</span>
+          <strong id="ret-slip-student-name">Student</strong>
+        </div>
+        <div class="receipt-row">
+          <span>Fine Settlement:</span>
+          <strong id="ret-slip-fine-paid">₹0.00</strong>
+        </div>
+
+        <div class="receipt-divider"></div>
+
+        <div class="receipt-stamp" style="border-color: #059669; color: #059669;">RETURN ACCEPTED</div>
+      </div>
+
+      <div style="display: flex; justify-content: center; gap: 10px; margin-top: 16px;">
+        <button class="btn btn-secondary btn-sm" onclick="window.app.closeModal('modal-return-slip')">Close</button>
+        <button class="btn btn-primary btn-sm" onclick="window.app.printCurrentSlip()">🖨️ Print Certificate</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- ========================================================================
+       SCRIPTS
+       ======================================================================== -->
+  <!-- External scanner library (offline fallback supported) -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+
+  <!-- Local Modular Scripts -->
+  <script src="js/xlsx_import.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/qr.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/auth.js"></script>
+
+</body>
+</html>

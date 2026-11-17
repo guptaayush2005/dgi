@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-accent="dronacharya">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#16010b">
+  <title>Admin Sign In | DGI Library</title>
+  <link rel="icon" type="image/png" href="logo.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="auth-page">
+  <main class="auth-shell">
+    <header class="auth-brand">
+      <img class="auth-logo" src="assets/logo.png" alt="Dronacharya Group of Institutions logo" onerror="this.onerror=null;this.src='logo.png';">
+      <div class="auth-brand-name">DGI LMS</div>
+      <div class="auth-brand-caption">LIBRARY MANAGEMENT SYSTEM</div>
+    </header>
+
+    <section class="auth-card" aria-labelledby="auth-heading">
+      <div class="auth-kicker" id="auth-kicker">LIBRARY ACCOUNT</div>
+      <h1 id="auth-heading">Sign In</h1>
+      <p class="auth-description" id="auth-description">Enter your username and password to access your library.</p>
+
+      <div class="auth-mode-switch" id="auth-mode-switch" aria-label="Authentication options">
+        <button class="auth-mode-button is-active" id="show-signin" type="button">Sign In</button>
+        <button class="auth-mode-button" id="show-register" type="button">Create Account</button>
+      </div>
+
+      <form id="login-form" class="auth-form">
+        <div id="default-credentials-hint" style="background: rgba(255, 197, 0, 0.15); border: 1px solid rgba(255, 197, 0, 0.4); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 0.85rem; color: #ffc500; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+          <div>
+            <strong>Default Admin:</strong> User: <code style="color: #fff; background: rgba(0,0,0,0.35); padding: 2px 6px; border-radius: 4px;">admin</code> &middot; Pass: <code style="color: #fff; background: rgba(0,0,0,0.35); padding: 2px 6px; border-radius: 4px;">admin123</code>
+          </div>
+          <button type="button" id="quick-fill-admin" class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer;">Fill</button>
+        </div>
+        <div class="auth-field">
+          <label class="auth-label" for="login-username">Username</label>
+          <input class="form-control auth-input" id="login-username" name="username" value="admin" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
+        </div>
+        <div class="auth-field">
+          <label class="auth-label" for="login-password">Password</label>
+          <div class="auth-password-wrap">
+            <input class="form-control auth-input" id="login-password" name="password" value="admin123" type="password" autocomplete="current-password" required>
+            <button class="auth-password-toggle" type="button" data-password-toggle="login-password" aria-label="Show password" aria-pressed="false">Show</button>
+          </div>
+        </div>
+        <button class="auth-link-button" id="show-forgot" type="button">Forgot password?</button>
+        <button class="btn btn-primary auth-submit" type="submit">Sign in</button>
+      </form>
+
+      <form id="forgot-form" class="auth-form" hidden>
+        <div class="auth-field">
+          <label class="auth-label" for="forgot-username">Username</label>
+          <input class="form-control auth-input" id="forgot-username" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
+          <small class="auth-hint">The reset link will be sent to the library recovery inbox.</small>
+        </div>
+        <button class="btn btn-primary auth-submit" type="submit">Send reset link</button>
+        <button class="auth-link-button auth-back-button" id="back-to-signin" type="button">Back to sign in</button>
+      </form>
+
+      <form id="reset-form" class="auth-form" hidden>
+        <div class="auth-field">
+          <label class="auth-label" for="reset-password">New password</label>
+          <div class="auth-password-wrap">
+            <input class="form-control auth-input" id="reset-password" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+            <button class="auth-password-toggle" type="button" data-password-toggle="reset-password" aria-label="Show password" aria-pressed="false">Show</button>
+          </div>
+        </div>
+        <div class="auth-field">
+          <label class="auth-label" for="reset-confirm-password">Confirm new password</label>
+          <div class="auth-password-wrap">
+            <input class="form-control auth-input" id="reset-confirm-password" name="confirm-password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+            <button class="auth-password-toggle" type="button" data-password-toggle="reset-confirm-password" aria-label="Show password" aria-pressed="false">Show</button>
+          </div>
+        </div>
+        <button class="btn btn-primary auth-submit" type="submit">Update password</button>
+      </form>
+
+      <form id="register-form" class="auth-form" hidden>
+        <div class="auth-field">
+          <label class="auth-label" for="register-username">Username</label>
+          <input class="form-control auth-input" id="register-username" name="username" autocomplete="username" minlength="3" maxlength="40" pattern="[A-Za-z0-9_.@ -]{3,40}" required>
+        </div>
+        <div class="auth-field">
+          <label class="auth-label" for="register-password">Password</label>
+          <div class="auth-password-wrap">
+            <input class="form-control auth-input" id="register-password" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+            <button class="auth-password-toggle" type="button" data-password-toggle="register-password" aria-label="Show password" aria-pressed="false">Show</button>
+          </div>
+        </div>
+        <div class="auth-field">
+          <label class="auth-label" for="register-confirm-password">Confirm password</label>
+          <div class="auth-password-wrap">
+            <input class="form-control auth-input" id="register-confirm-password" name="confirm-password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+            <button class="auth-password-toggle" type="button" data-password-toggle="register-confirm-password" aria-label="Show password" aria-pressed="false">Show</button>
+          </div>
+        </div>
+        <button class="btn btn-primary auth-submit" type="submit">Create Account</button>
+      </form>
+
+      <form id="setup-form" class="auth-form" hidden>
+        <div class="auth-field">
+          <label class="auth-label" for="setup-username">Username</label>
+          <input class="form-control auth-input" id="setup-username" name="username" autocomplete="username" minlength="3" maxlength="40" pattern="[A-Za-z0-9_.@ -]{3,40}" required>
+        </div>
+        <div class="auth-field">
+          <label class="auth-label" for="setup-password">Password</label>
+          <div class="auth-password-wrap">
+            <input class="form-control auth-input" id="setup-password" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+            <button class="auth-password-toggle" type="button" data-password-toggle="setup-password" aria-label="Show password" aria-pressed="false">Show</button>
+          </div>
+        </div>
+        <div class="auth-field">
+          <label class="auth-label" for="setup-confirm-password">Confirm password</label>
+          <div class="auth-password-wrap">
+            <input class="form-control auth-input" id="setup-confirm-password" name="confirm-password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+            <button class="auth-password-toggle" type="button" data-password-toggle="setup-confirm-password" aria-label="Show password" aria-pressed="false">Show</button>
+          </div>
+        </div>
+        <button class="btn btn-primary auth-submit" type="submit">Continue</button>
+      </form>
+
+      <p class="auth-message" id="auth-message" role="status" aria-live="polite"></p>
+    </section>
+    <p class="auth-notice">Administrator credentials are protected by the server.</p>
+    <p class="auth-contact">Dronacharya Group of Institutions, Greater Noida · Since 2006<br>#27, APJ Abdul Kalam Road, Knowledge Park-III, Greater Noida, Uttar Pradesh - 201306<br>Phone: 0120-2322022, 2323851-56 · Email: info@dronacharya.info</p>
+    <div class="app-creator-credit auth-footer-credit">Designed and Developed by <strong>Prince Singh</strong></div>
+  </main>
+  <script src="js/auth.js"></script>
+</body>
+</html>
