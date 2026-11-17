@@ -160,6 +160,15 @@ function seedStore() {
 }
 function loadStore() {
   try {
+    const rootDataFile = path.join(ROOT, 'data', 'library-data.json');
+    if (process.env.VERCEL && !fs.existsSync(DATA_FILE) && fs.existsSync(rootDataFile)) {
+      try {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+        fs.copyFileSync(rootDataFile, DATA_FILE);
+      } catch (e) {
+        console.warn('Could not copy bundled library-data.json to /tmp:', e);
+      }
+    }
     if (!fs.existsSync(DATA_FILE)) {
       try {
         fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -285,6 +294,13 @@ function send(res, code, body, type, extraHeaders) {
 }
 function readBody(req, limitBytes = 25 * 1024 * 1024) {
   return new Promise((resolve) => {
+    if (req.body !== undefined && req.body !== null) {
+      if (typeof req.body === 'object') return resolve(req.body);
+      if (typeof req.body === 'string') {
+        try { return resolve(JSON.parse(req.body || '{}')); }
+        catch { return resolve({ raw: req.body }); }
+      }
+    }
     let data = '';
     req.on('data', chunk => {
       data += chunk;
