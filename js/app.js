@@ -3179,22 +3179,231 @@ class DGIApp {
     }
   }
 
-  // --- Book Entry ISBN / QR Scanner ---
-  openBookEntryScanner() {
-    if (!document.getElementById("modal-book")?.classList.contains("active")) {
-      this.openAddBookModal();
+  // --- CSV Import (3 Columns: Name, Author, Category) ---
+  openCsvImportModal() {
+    this._pendingCsvText = null;
+    this._parsedCsvRows = null;
+    const fileInput = document.getElementById("csv-file-input");
+    if (fileInput) fileInput.value = "";
+    const previewSection = document.getElementById("csv-preview-section");
+    if (previewSection) previewSection.style.display = "none";
+    const progress = document.getElementById("csv-import-progress");
+    if (progress) progress.style.display = "none";
+    const results = document.getElementById("csv-import-results");
+    if (results) results.style.display = "none";
+    const confirmBtn = document.getElementById("csv-confirm-import-btn");
+    if (confirmBtn) {
+      confirmBtn.style.display = "none";
+      confirmBtn.disabled = false;
     }
-    const modal = document.getElementById("modal-scanner");
+    this.openModal("modal-csv-import");
+  }
+
+  handleCsvFileSelection(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      this.showToast("Invalid File Type", "Please select a valid .csv file.", "warning");
+      event.target.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target.result;
+      this._pendingCsvText = text;
+      this._parseAndPreviewCsv(text);
+    };
+    reader.onerror = () => {
+      this.showToast("File Read Error", "Could not read the selected CSV file.", "danger");
+    };
+    reader.readAsText(file);
+  }
+
+  _parseAndPreviewCsv(text) {
+    const parseCSV = (str) => {
+      const rows = [];
+      let currentRow = [];
+      let currentVal = "";
+      let inQuotes = false;
+      let i = 0;
+      const s = String(str || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+      while (i < s.length) {
+        const char = s[i];
+        if (inQuotes) {
+          if (char === '"') {
+            if (i + 1 < s.length && s[i + 1] === '"') {
+              currentVal += '"';
+              i += 2;
+              continue;
+            } else {
+              inQuotes = false;
+              i++;
+              continue;
+            }
+          } else {
+            currentVal += char;
+            i++;
+            continue;
+          }
+        } else {
+          if (char === '"') {
+            inQuotes = true;
+            i++;
+            continue;
+          } else if (char === ",") {
+            currentRow.push(currentVal);
+            currentVal = "";
+            i++;
+            continue;
+          } else if (char === "\n") {
+            currentRow.push(currentVal);
+            currentVal = "";
+            if (currentRow.some(val => val.trim().length > 0)) rows.push(currentRow);
+            currentRow = [];
+            i++;
+            continue;
+          } else {
+            currentVal += char;
+            i++;
+            continue;
+          }
+        }
+      }
+      if (currentVal || currentRow.length > 0) {
+        currentRow.push(currentVal);
+        if (currentRow.some(val => val.trim().length > 0)) rows.push(currentRow);
+      }
+      return rows;
+    };
+
+    const rows = parseCSV(text);
+    if (!rows || rows.length < 2) {
+      this.showToast("Empty CSV", "The CSV file contains no data rows.", "warning");
+      return;
+    }
+
+    const headers = rows[0].map(h => String(h || "").trim().toLowerCase());
+    const nameIdx = headers.findIndex(h => ["name", "title", "book_name", "book title", "book"].includes(h));
+    const authorIdx = headers.findIndex(h => ["author", "authors", "writer", "book_author"].includes(h));
+    const categoryIdx = headers.findIndex(h => ["category", "genre", "department", "subject", "branch"].includes(h));
+
+    if (nameIdx === -1 || authorIdx === -1 || categoryIdx === -1) {
+      const missing = [];
+      if (nameIdx === -1) missing.push("Name");
+      if (authorIdx === -1) missing.push("Author");
+      if (categoryIdx === -1) missing.push("Category");
+      this.showToast("Invalid CSV Headers", `Missing required columns: ${missing.join(", ")}. File must have Name, Author, and Category.`, "danger");
+      return;
+    }
+
+    const previewTbody = document.getElementById("csv-preview-tbody");
+    if (previewTbody) {
+      previewTbody.innerHTML = "";
+      const previewRows = rows.slice(1, 6);
+      previewRows.forEach(r => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><strong>${this.escapeHtml(String(r[nameIdx] || ""))}</strong></td>
+          <td>${this.escapeHtml(String(r[authorIdx] || ""))}</td>
+          <td><span class="badge badge-primary">${this.escapeHtml(String(r[categoryIdx] || ""))}</span></td>
+        `;
+        previewTbody.appendChild(tr);
+      });
+    }
+
+    const countElem = document.getElementById("csv-preview-count");
+    if (countElem) countElem.textContent = String(rows.length - 1);
+
+    const previewSection = document.getElementById("csv-preview-section");
+    if (previewSection) previewSection.style.display = "block";
+    const confirmBtn = document.getElementById("csv-confirm-import-btn");
+    if (confirmBtn) confirmBtn.style.display = "inline-block";
+  }
+
+  async executeCsvImport() {
+    if (!this._pendingCsvText) {
+      this.showToast("No File Selected", "Please select a .csv file first.", "warning");
+      return;
+    }
+
+    const progress = document.getElementById("csv-import-progress");
+    const confirmBtn = document.getElementById("csv-confirm-import-btn");
+    const results = document.getElementById("csv-import-results");
+
+    if (progress) progress.style.display = "block";
+    if (confirmBtn) confirmBtn.disabled = true;
+    if (results) results.style.display = "none";
+
+    try {
+      const response = await fetch("/api/admin/books/import-csv", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ csv: this._pendingCsvText })
+      });
+
+      const res = await response.json();
+      if (!response.ok) {
+        throw new Error(res.error || `Server error (${response.status})`);
+      }
+
+      if (progress) progress.style.display = "none";
+      if (results) results.style.display = "block";
+      if (confirmBtn) confirmBtn.style.display = "none";
+
+      document.getElementById("csv-summary-total").textContent = res.totalFound;
+      document.getElementById("csv-summary-imported").textContent = res.importedCount;
+      document.getElementById("csv-summary-duplicates").textContent = res.duplicateCount;
+      document.getElementById("csv-summary-invalid").textContent = res.invalidCount;
+
+      const errorBox = document.getElementById("csv-summary-errors-box");
+      if (errorBox) {
+        if (res.errors && res.errors.length > 0) {
+          errorBox.innerHTML = `<strong>Validation Issues:</strong><br>${res.errors.join("<br>")}`;
+          errorBox.style.display = "block";
+        } else {
+          errorBox.style.display = "none";
+        }
+      }
+
+      if (Array.isArray(res.books)) {
+        const data = window.db._getData();
+        data.books = res.books;
+        window.db._saveData(data);
+        this.renderBooks();
+        this.renderDashboard();
+        if (typeof this.updateCategoryPills === "function") this.updateCategoryPills();
+      }
+
+      this.showToast("Import Successful", `${res.importedCount} new book(s) imported into catalog.`, "success");
+    } catch (err) {
+      if (progress) progress.style.display = "none";
+      if (confirmBtn) confirmBtn.disabled = false;
+      this.showToast("Import Failed", err.message, "danger");
+    }
+  }
+
+  // --- Book Entry ISBN / Barcode / OCR Scanner ---
+  openBookScannerModal() {
+    this.resetScannerPreview();
+    this.switchScannerTab("barcode");
+    this.openModal("modal-scanner");
     const manualInput = document.getElementById("scanner-manual-input");
     if (manualInput) manualInput.value = "";
-    modal.classList.add("active");
-
     const video = document.getElementById("scanner-video");
-    window.qrManager.startCamera(
-      video,
-      (decodedText) => this.handleBookEntryScan(decodedText),
-      (errMsg) => console.log("Camera notice:", errMsg)
-    );
+    if (video) {
+      window.qrManager.startCamera(
+        video,
+        (decodedText) => this.handleBookEntryScan(decodedText),
+        (errMsg) => console.log("Camera notice:", errMsg)
+      );
+    }
+  }
+
+  openBookEntryScanner() {
+    this.openBookScannerModal();
   }
 
   closeScannerModal() {
@@ -3202,49 +3411,115 @@ class DGIApp {
     this.closeModal("modal-scanner");
   }
 
-  handleBookEntryScan(scannedData) {
-    this.closeScannerModal();
-    const fields = {};
-    let code = String(scannedData || "").trim();
-    if (!code) return;
+  switchScannerTab(tab) {
+    const isBarcode = tab === "barcode";
+    const tabBarcode = document.getElementById("scanner-tab-barcode");
+    const tabOcr = document.getElementById("scanner-tab-ocr");
+    const btnBarcode = document.getElementById("scanner-tab-btn-barcode");
+    const btnOcr = document.getElementById("scanner-tab-btn-ocr");
 
-    try {
-      const parsed = JSON.parse(code);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        code = String(parsed.isbn || parsed.ISBN || parsed.isbn13 || parsed.ISBN13 || parsed.barcode || "").trim();
-        const bookTitle = parsed.title || parsed.book_title || parsed.bookTitle;
-        const bookAuthor = parsed.author || parsed.book_author || parsed.bookAuthor;
-        const bookCategory = parsed.category || parsed.genre;
-        if (bookTitle) fields["book-modal-title-input"] = bookTitle;
-        if (bookAuthor) fields["book-modal-author"] = bookAuthor;
-        if (bookCategory) fields["book-modal-category"] = bookCategory;
-        if (parsed.description) fields["book-modal-desc"] = parsed.description;
-        if (parsed.quantity) fields["book-modal-qty"] = parsed.quantity;
-      }
-    } catch (_) {
-      // Standard ISBN/barcode values are plain text.
+    if (tabBarcode) tabBarcode.style.display = isBarcode ? "block" : "none";
+    if (tabOcr) tabOcr.style.display = !isBarcode ? "block" : "none";
+
+    if (btnBarcode) {
+      btnBarcode.style.background = isBarcode ? "var(--accent-primary)" : "transparent";
+      btnBarcode.style.color = isBarcode ? "#16010b" : "var(--text-secondary)";
+    }
+    if (btnOcr) {
+      btnOcr.style.background = !isBarcode ? "var(--accent-primary)" : "transparent";
+      btnOcr.style.color = !isBarcode ? "#16010b" : "var(--text-secondary)";
     }
 
-    if (code) fields["book-modal-isbn"] = code;
-    const filledFields = [];
-    Object.entries(fields).forEach(([id, value]) => {
-      const input = document.getElementById(id);
-      if (!input) return;
-      input.value = String(value);
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-      input.dispatchEvent(new Event("change", { bubbles: true }));
-      filledFields.push(id);
-    });
+    if (!isBarcode) {
+      window.qrManager.stopCamera();
+    } else {
+      const video = document.getElementById("scanner-video");
+      if (video) {
+        window.qrManager.startCamera(
+          video,
+          (decodedText) => this.handleBookEntryScan(decodedText),
+          (errMsg) => console.log("Camera notice:", errMsg)
+        );
+      }
+    }
+  }
 
-    if (!filledFields.length) {
-      this.showToast("Book QR Not Recognized", "Scan an ISBN barcode or a book QR containing ISBN and book details.", "warning");
+  resetScannerPreview() {
+    const preview = document.getElementById("scanner-book-preview");
+    if (preview) preview.style.display = "none";
+    const disclaimer = document.getElementById("scanner-disclaimer");
+    if (disclaimer) disclaimer.style.display = "none";
+    const statusBox = document.getElementById("scanner-status-box");
+    if (statusBox) statusBox.style.display = "none";
+    const ocrBox = document.getElementById("ocr-preview-box");
+    if (ocrBox) ocrBox.style.display = "none";
+    ["scan-book-title", "scan-book-author", "scan-book-category", "scan-book-isbn", "scan-book-publisher"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = "";
+    });
+    const qty = document.getElementById("scan-book-qty");
+    if (qty) qty.value = "1";
+  }
+
+  async lookupIsbnMetadata(code) {
+    const isbn = String(code || document.getElementById("scanner-manual-input")?.value || "").trim();
+    if (!isbn) {
+      this.showToast("ISBN Required", "Please enter or scan an ISBN.", "warning");
       return;
     }
-    this.showToast("Book Details Scanned", `${filledFields.length} book field(s) filled. Check the details and save the book entry.`, "success");
+
+    const statusBox = document.getElementById("scanner-status-box");
+    const statusText = document.getElementById("scanner-status-text");
+    if (statusBox) statusBox.style.display = "block";
+    if (statusText) statusText.textContent = `Fetching metadata for ISBN: ${isbn}...`;
+
+    try {
+      const response = await fetch(`/api/admin/books/metadata?isbn=${encodeURIComponent(isbn)}`, {
+        credentials: "same-origin"
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Metadata not found.");
+
+      if (statusBox) statusBox.style.display = "none";
+      const book = data.book || {};
+
+      document.getElementById("scan-book-title").value = book.title || "";
+      document.getElementById("scan-book-author").value = book.author || "";
+      document.getElementById("scan-book-category").value = book.category || "CSIT";
+      document.getElementById("scan-book-isbn").value = book.isbn || isbn;
+      document.getElementById("scan-book-publisher").value = book.publisher || "";
+      document.getElementById("scan-book-qty").value = "1";
+
+      const disclaimer = document.getElementById("scanner-disclaimer");
+      if (disclaimer) disclaimer.style.display = "none";
+
+      document.getElementById("scanner-book-preview").style.display = "block";
+      this.showToast("Metadata Found", `Loaded: "${book.title}". Please verify before saving.`, "success");
+    } catch (err) {
+      if (statusBox) statusBox.style.display = "none";
+      document.getElementById("scan-book-isbn").value = isbn;
+      document.getElementById("scanner-book-preview").style.display = "block";
+      this.showToast("Manual Details Entry", `${err.message} You can enter details manually.`, "info");
+    }
+  }
+
+  handleBookEntryScan(scannedData) {
+    let code = String(scannedData || "").trim();
+    if (!code) return;
+    try {
+      const parsed = JSON.parse(code);
+      if (parsed && typeof parsed === "object") {
+        code = parsed.isbn || parsed.ISBN || parsed.barcode || code;
+      }
+    } catch (_) {}
+
+    const manualInput = document.getElementById("scanner-manual-input");
+    if (manualInput) manualInput.value = code;
+    this.lookupIsbnMetadata(code);
   }
 
   handleScannerFileUpload(event) {
-    const file = event.target.files[0];
+    const file = event.target.files && event.target.files[0];
     if (!file) return;
 
     window.qrManager.decodeImageFile(
@@ -3256,9 +3531,105 @@ class DGIApp {
   }
 
   submitManualScan() {
-    const val = document.getElementById("scanner-manual-input")?.value?.trim();
-    if (val) {
-      this.handleBookEntryScan(val);
+    this.lookupIsbnMetadata();
+  }
+
+  async handleCoverOcrUpload(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    const statusBox = document.getElementById("scanner-status-box");
+    const statusText = document.getElementById("scanner-status-text");
+    if (statusBox) statusBox.style.display = "block";
+    if (statusText) statusText.textContent = "Analyzing book cover with AI OCR...";
+
+    const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]+/g, " ");
+
+    try {
+      const response = await fetch("/api/admin/books/ocr", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: cleanName })
+      });
+      const data = await response.json();
+
+      if (statusBox) statusBox.style.display = "none";
+      const ocrBox = document.getElementById("ocr-preview-box");
+      const detectedText = document.getElementById("ocr-detected-text");
+      if (ocrBox && detectedText) {
+        ocrBox.style.display = "block";
+        detectedText.textContent = `Cover file: ${file.name}\nExtracted Title: ${data.title}\nAuthor: ${data.author}\nSuggested Subject: ${data.category}`;
+      }
+
+      document.getElementById("scan-book-title").value = data.title || cleanName;
+      document.getElementById("scan-book-author").value = data.author || "";
+      document.getElementById("scan-book-category").value = data.category || "CSIT";
+      document.getElementById("scan-book-isbn").value = "";
+      document.getElementById("scan-book-publisher").value = "";
+      document.getElementById("scan-book-qty").value = "1";
+
+      const disclaimer = document.getElementById("scanner-disclaimer");
+      if (disclaimer) disclaimer.style.display = "block";
+
+      document.getElementById("scanner-book-preview").style.display = "block";
+      this.showToast("Cover OCR Complete", "Details extracted! Scanned via AI OCR. Please verify details before saving.", "info");
+    } catch (err) {
+      if (statusBox) statusBox.style.display = "none";
+      this.showToast("OCR Error", err.message, "danger");
+    }
+    event.target.value = "";
+  }
+
+  async saveScannedBook() {
+    const title = (document.getElementById("scan-book-title")?.value || "").trim();
+    const author = (document.getElementById("scan-book-author")?.value || "").trim();
+    const category = (document.getElementById("scan-book-category")?.value || "").trim();
+    const isbn = (document.getElementById("scan-book-isbn")?.value || "").trim();
+    const publisher = (document.getElementById("scan-book-publisher")?.value || "").trim();
+    const qty = parseInt(document.getElementById("scan-book-qty")?.value, 10) || 1;
+
+    if (!title) {
+      this.showToast("Title Required", "Please enter the book title/name.", "warning");
+      return;
+    }
+    if (!category) {
+      this.showToast("Category Required", "Please enter the category.", "warning");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/admin/books", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          author,
+          category,
+          isbn,
+          publisher,
+          quantity: qty,
+          description: "Added via Book Scanner & OCR."
+        })
+      });
+
+      const res = await response.json();
+      if (!response.ok) throw new Error(res.error || "Failed to save book.");
+
+      if (Array.isArray(res.books)) {
+        const data = window.db._getData();
+        data.books = res.books;
+        window.db._saveData(data);
+        this.renderBooks();
+        this.renderDashboard();
+        if (typeof this.updateCategoryPills === "function") this.updateCategoryPills();
+      }
+
+      this.closeScannerModal();
+      this.showToast("Book Saved", `"${title}" has been saved to the library catalog!`, "success");
+    } catch (err) {
+      this.showToast("Save Failed", err.message, "danger");
     }
   }
 

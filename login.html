@@ -104,27 +104,20 @@
         <button class="auth-mode-button" id="show-register" type="button">Create Account</button>
       </div>
 
-      <div id="default-credentials-hint" style="background: rgba(255, 197, 0, 0.15); border: 1px solid rgba(255, 197, 0, 0.4); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 0.85rem; color: #ffc500; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-        <div>
-          <strong>Default Admin:</strong> User: <code style="color: #fff; background: rgba(0,0,0,0.35); padding: 2px 6px; border-radius: 4px;">admin</code> &middot; Pass: <code style="color: #fff; background: rgba(0,0,0,0.35); padding: 2px 6px; border-radius: 4px;">admin123</code>
-        </div>
-        <button type="button" id="quick-fill-admin" class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; cursor: pointer; background: transparent; border: 1px solid #ffc500; color: #ffc500;">Fill</button>
-      </div>
-
       <form id="login-form" class="auth-form" method="POST" action="javascript:void(0);">
         <div class="auth-field">
-          <label class="auth-label" for="login-username">Username</label>
-          <input class="form-control auth-input" id="login-username" name="username" value="admin" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
+          <label class="auth-label" for="login-username">Username or Email</label>
+          <input class="form-control auth-input" id="login-username" name="username" placeholder="Enter username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
         </div>
         <div class="auth-field">
           <label class="auth-label" for="login-password">Password</label>
           <div class="auth-password-wrap">
-            <input class="form-control auth-input" id="login-password" name="password" value="admin123" type="password" autocomplete="current-password" required>
+            <input class="form-control auth-input" id="login-password" name="password" placeholder="Enter password" type="password" autocomplete="current-password" required>
             <button class="auth-password-toggle" type="button" data-password-toggle="login-password" aria-label="Show password" aria-pressed="false">Show</button>
           </div>
         </div>
         <button class="auth-link-button" id="show-forgot" type="button">Forgot password?</button>
-        <button class="btn btn-primary auth-submit" type="submit">Sign in</button>
+        <button class="btn btn-primary auth-submit" id="login-submit-btn" type="submit">Sign in</button>
       </form>
 
       <form id="forgot-form" class="auth-form" hidden>
@@ -215,28 +208,26 @@
     <div class="app-creator-credit auth-footer-credit">Designed and Developed by <strong>Ayush Gupta (CSIT)</strong></div>
   </main>
   <script>
-    // Self-contained resilient authentication handler
+    // Production Secure Authentication Handler
     (function() {
+      const loginForm = document.getElementById("login-form");
+      const setupForm = document.getElementById("setup-form");
+      const registerForm = document.getElementById("register-form");
+      const forgotForm = document.getElementById("forgot-form");
+      const resetForm = document.getElementById("reset-form");
+      const modeSwitch = document.getElementById("auth-mode-switch");
+      const showSigninButton = document.getElementById("show-signin");
+      const showRegisterButton = document.getElementById("show-register");
+      const heading = document.getElementById("auth-heading");
+      const description = document.getElementById("auth-description");
+      const submitBtn = document.getElementById("login-submit-btn");
+
       function showMessage(message, isError = true) {
         const element = document.getElementById("auth-message");
         if (!element) return;
         element.textContent = message;
         element.classList.toggle("is-error", isError);
         element.classList.toggle("is-success", !isError);
-      }
-
-      function getLocalAccounts() {
-        try {
-          return JSON.parse(localStorage.getItem("dgi_local_accounts") || "{}");
-        } catch {
-          return {};
-        }
-      }
-
-      function saveLocalAccounts(accounts) {
-        try {
-          localStorage.setItem("dgi_local_accounts", JSON.stringify(accounts));
-        } catch {}
       }
 
       async function readResponse(response, fallbackMessage) {
@@ -252,49 +243,23 @@
       }
 
       async function submitCredentials(path, username, password) {
-        let authUser = username;
-        let loggedIn = false;
-
-        // 1. Try server login if on http/https
-        if (["http:", "https:"].includes(window.location.protocol)) {
-          try {
-            const response = await fetch(path, {
-              method: "POST",
-              credentials: "same-origin",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ username, password })
-            });
-            const result = await readResponse(response, "Authentication failed.");
-            authUser = result.username || username;
-            loggedIn = true;
-          } catch (err) {
-            console.warn("Server auth check error, falling back to local credentials:", err);
-          }
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.dataset.originalText = submitBtn.textContent;
+          submitBtn.textContent = "Verifying...";
         }
+        showMessage("");
 
-        // 2. Local fallback check
-        if (!loggedIn) {
-          const u = String(username || "").trim().toLowerCase();
-          const p = String(password || "");
-          const accounts = getLocalAccounts();
+        try {
+          const response = await fetch(path, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password })
+          });
+          const result = await readResponse(response, "Authentication failed. Please check your credentials.");
+          const authUser = result.username || username;
 
-          if (u === "admin" && p === "admin123") {
-            authUser = "admin";
-            loggedIn = true;
-          } else if (accounts[u] && accounts[u].password === p) {
-            authUser = accounts[u].username || username;
-            loggedIn = true;
-          } else if (path.includes("register") || path.includes("setup")) {
-            accounts[u] = { username, password: p, isPrimary: Object.keys(accounts).length === 0 };
-            saveLocalAccounts(accounts);
-            authUser = username;
-            loggedIn = true;
-          } else {
-            throw new Error("Invalid username or password. (Default is admin / admin123)");
-          }
-        }
-
-        if (loggedIn) {
           const sessionData = JSON.stringify({
             username: authUser,
             isPrimary: true,
@@ -302,19 +267,24 @@
           });
           sessionStorage.setItem("dgi_admin_session", sessionData);
           localStorage.setItem("dgi_admin_session", sessionData);
-          showMessage("Sign in successful! Redirecting to dashboard...", false);
+          showMessage("Authentication successful. Redirecting to Admin Dashboard...", false);
           setTimeout(() => {
             window.location.replace("index.html");
           }, 200);
+        } catch (err) {
+          showMessage(err.message || "Invalid credentials.");
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = submitBtn.dataset.originalText || "Sign in";
+          }
+          throw err;
         }
       }
 
       window.adminAuth = {
         async logout() {
           try {
-            if (["http:", "https:"].includes(window.location.protocol)) {
-              await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
-            }
+            await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
           } catch (e) {}
           sessionStorage.removeItem("dgi_admin_session");
           localStorage.removeItem("dgi_admin_session");
@@ -322,51 +292,39 @@
         }
       };
 
-      const loginForm = document.getElementById("login-form");
-      const setupForm = document.getElementById("setup-form");
-      const registerForm = document.getElementById("register-form");
-      const forgotForm = document.getElementById("forgot-form");
-      const resetForm = document.getElementById("reset-form");
-      const modeSwitch = document.getElementById("auth-mode-switch");
-      const showSigninButton = document.getElementById("show-signin");
-      const showRegisterButton = document.getElementById("show-register");
-      const heading = document.getElementById("auth-heading");
-      const description = document.getElementById("auth-description");
-
-      // Auto-login check if query params present (e.g. from previous GET submission)
-      const urlParams = new URLSearchParams(window.location.search);
-      const qUser = urlParams.get("username");
-      const qPass = urlParams.get("password");
-      if (qUser && qPass) {
-        window.history.replaceState(null, "", window.location.pathname);
-        showMessage("Verifying credentials and signing in...", false);
-        submitCredentials("/api/auth/login", qUser, qPass).catch(err => {
-          showMessage(err.message);
-        });
-      }
-
-      // Check if already authenticated
-      try {
-        const raw = sessionStorage.getItem("dgi_admin_session") || localStorage.getItem("dgi_admin_session");
-        if (raw) {
-          const s = JSON.parse(raw);
-          if (s && s.username && !qUser) {
-            window.location.replace("index.html");
-            return;
+      // Check server session on page load
+      (async function checkCurrentSession() {
+        try {
+          const res = await fetch("/api/auth/status", { credentials: "same-origin" });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.authenticated) {
+              const sessionData = JSON.stringify({
+                username: data.username || "admin",
+                isPrimary: Boolean(data.isPrimaryAccount)
+              });
+              sessionStorage.setItem("dgi_admin_session", sessionData);
+              localStorage.setItem("dgi_admin_session", sessionData);
+              window.location.replace("index.html");
+              return;
+            } else {
+              sessionStorage.removeItem("dgi_admin_session");
+              localStorage.removeItem("dgi_admin_session");
+            }
+            if (data.setupRequired) {
+              if (loginForm) loginForm.hidden = true;
+              if (setupForm) setupForm.hidden = false;
+              if (modeSwitch) modeSwitch.hidden = true;
+              if (heading) heading.textContent = "Setup Administrator";
+              if (description) description.textContent = "Create the initial administrator account.";
+            }
           }
+        } catch (err) {
+          console.warn("Auth status check failed:", err);
         }
-      } catch (e) {}
+      })();
 
-      // Quick fill button
-      document.getElementById("quick-fill-admin")?.addEventListener("click", () => {
-        const u = document.getElementById("login-username");
-        const p = document.getElementById("login-password");
-        if (u) u.value = "admin";
-        if (p) p.value = "admin123";
-        showMessage("Default credentials filled (admin / admin123)", false);
-      });
-
-      // Password toggle
+      // Password toggle buttons
       document.querySelectorAll("[data-password-toggle]").forEach(button => {
         button.addEventListener("click", () => {
           const field = document.getElementById(button.dataset.passwordToggle);
@@ -385,15 +343,19 @@
           e.preventDefault();
           const u = (document.getElementById("login-username")?.value || "").trim();
           const p = document.getElementById("login-password")?.value || "";
+          if (!u || !p) {
+            showMessage("Please enter both username and password.");
+            return;
+          }
           try {
             await submitCredentials("/api/auth/login", u, p);
-          } catch (err) {
-            showMessage(err.message);
+          } catch (_) {
+            // Handled inside submitCredentials
           }
         });
       }
 
-      // Mode switch
+      // Mode switch: Sign In vs Create Account
       function showAuthMode(mode) {
         const registering = mode === "register";
         if (loginForm) loginForm.hidden = registering;
@@ -402,7 +364,7 @@
         if (showRegisterButton) showRegisterButton.classList.toggle("is-active", registering);
         if (heading) heading.textContent = registering ? "Create Account" : "Sign In";
         if (description) description.textContent = registering
-          ? "Create a new account with its own separate library database."
+          ? "Create a new librarian account with its own library database."
           : "Enter your username and password to access your library.";
         showMessage("");
       }
@@ -410,21 +372,21 @@
       showSigninButton?.addEventListener("click", () => showAuthMode("signin"));
       showRegisterButton?.addEventListener("click", () => showAuthMode("register"));
 
-      registerForm?.addEventListener("submit", async function(e) {
-        e.preventDefault();
-        const u = String(new FormData(registerForm).get("username") || "").trim();
-        const p = String(new FormData(registerForm).get("password") || "");
-        const cp = String(new FormData(registerForm).get("confirm-password") || "");
-        if (p !== cp) {
-          showMessage("Passwords do not match.");
-          return;
-        }
-        try {
-          await submitCredentials("/api/auth/register", u, p);
-        } catch (err) {
-          showMessage(err.message);
-        }
-      });
+      if (registerForm) {
+        registerForm.addEventListener("submit", async function(e) {
+          e.preventDefault();
+          const u = String(new FormData(registerForm).get("username") || "").trim();
+          const p = String(new FormData(registerForm).get("password") || "");
+          const cp = String(new FormData(registerForm).get("confirm-password") || "");
+          if (p !== cp) {
+            showMessage("Passwords do not match.");
+            return;
+          }
+          try {
+            await submitCredentials("/api/auth/register", u, p);
+          } catch (_) {}
+        });
+      }
     })();
   </script>
 </body>

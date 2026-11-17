@@ -315,6 +315,129 @@ function findTransaction(accountKey, transactionId) {
 }
 
 // ---------------------------------------------------------------------------
+// Security Middleware & Utility Helpers
+// ---------------------------------------------------------------------------
+function requireAdmin(req, res) {
+  const account = requestAccount(req);
+  if (!account) {
+    send(res, 401, { error: 'Authentication required. Please sign in as administrator.' });
+    return null;
+  }
+  return account;
+}
+
+function parseCSV(text) {
+  const rows = [];
+  let currentRow = [];
+  let currentVal = '';
+  let inQuotes = false;
+  let i = 0;
+  const str = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  while (i < str.length) {
+    const char = str[i];
+    if (inQuotes) {
+      if (char === '"') {
+        if (i + 1 < str.length && str[i + 1] === '"') {
+          currentVal += '"';
+          i += 2;
+          continue;
+        } else {
+          inQuotes = false;
+          i++;
+          continue;
+        }
+      } else {
+        currentVal += char;
+        i++;
+        continue;
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true;
+        i++;
+        continue;
+      } else if (char === ',') {
+        currentRow.push(currentVal);
+        currentVal = '';
+        i++;
+        continue;
+      } else if (char === '\n') {
+        currentRow.push(currentVal);
+        currentVal = '';
+        if (currentRow.some(val => val.trim().length > 0)) {
+          rows.push(currentRow);
+        }
+        currentRow = [];
+        i++;
+        continue;
+      } else {
+        currentVal += char;
+        i++;
+        continue;
+      }
+    }
+  }
+  if (currentVal || currentRow.length > 0) {
+    currentRow.push(currentVal);
+    if (currentRow.some(val => val.trim().length > 0)) {
+      rows.push(currentRow);
+    }
+  }
+  return rows;
+}
+
+function suggestAcademicCategory(text) {
+  const t = String(text || '').toLowerCase();
+  if (/\b(computer|programming|software|algorithm|data structure|python|java|c\+\+|javascript|database|sql|network|operating system|artificial intelligence|machine learning|web|cyber|cloud|compiler)\b/i.test(t)) {
+    return 'CSIT';
+  }
+  if (/\b(circuit|electronic|signal|communication|vlsi|semiconductor|microprocessor|embedded|antenna|telecom)\b/i.test(t)) {
+    return 'Electronics';
+  }
+  if (/\b(mechanical|thermodynamics|fluid|heat transfer|mechanics|manufacturing|machine design|kinematics|cad|cam)\b/i.test(t)) {
+    return 'Mechanical';
+  }
+  if (/\b(civil|concrete|structure|surveying|geotechnical|construction|environmental|transportation)\b/i.test(t)) {
+    return 'Civil';
+  }
+  if (/\b(math|calculus|algebra|discrete|statistics|probability|differential|numerical)\b/i.test(t)) {
+    return 'Mathematics';
+  }
+  if (/\b(physics|optics|quantum|electromagnetism|thermodynamics)\b/i.test(t)) {
+    return 'Physics';
+  }
+  if (/\b(chemistry|organic|inorganic|polymer)\b/i.test(t)) {
+    return 'Chemistry';
+  }
+  if (/\b(management|business|economics|communication skills|finance|marketing|entrepreneurship)\b/i.test(t)) {
+    return 'Management';
+  }
+  return 'CSIT';
+}
+
+function fetchJson(urlStr, timeoutMs = 4000) {
+  return new Promise((resolve) => {
+    try {
+      const u = new URL(urlStr);
+      const mod = u.protocol === 'https:' ? require('https') : require('http');
+      const req = mod.get(urlStr, { headers: { 'User-Agent': 'DGILMS/1.0' }, timeout: timeoutMs }, (res) => {
+        let data = '';
+        res.on('data', chunk => { data += chunk; });
+        res.on('end', () => {
+          try { resolve(JSON.parse(data)); }
+          catch { resolve(null); }
+        });
+      });
+      req.on('timeout', () => { req.destroy(); resolve(null); });
+      req.on('error', () => { resolve(null); });
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Server
 // ---------------------------------------------------------------------------
 async function handleRequest(req, res) {
@@ -576,6 +699,249 @@ async function handleRequest(req, res) {
       entry.revision += 1;
       await saveStore();
       return send(res, 200, { revision: entry.revision });
+    }
+
+    // ==================== ADMIN BOOKS & CSV IMPORT =========================
+    if (p === '/api/admin/books/import-csv' && method === 'POST') {
+      const account = requireAdmin(req, res);
+      if (!account) return;
+      const b = await readBody(req);
+      const csvText = String(b.csv || '').trim();
+      if (!csvText) return send(res, 400, { error: 'CSV content is required.' });
+
+      const rows = parseCSV(csvText);
+      if (!rows || rows.length < 2) {
+        return send(res, 400, { error: 'The CSV file is empty or missing data rows.' });
+      }
+
+      const headers = rows[0].map(h => String(h || '').trim().toLowerCase());
+      const nameIdx = headers.findIndex(h => ['name', 'title', 'book_name', 'book title', 'book'].includes(h));
+      const authorIdx = headers.findIndex(h => ['author', 'authors', 'writer', 'book_author'].includes(h));
+      const categoryIdx = headers.findIndex(h => ['category', 'genre', 'department', 'subject', 'branch'].includes(h));
+
+      if (nameIdx === -1 || authorIdx === -1 || categoryIdx === -1) {
+        const missing = [];
+        if (nameIdx === -1) missing.push('Name');
+        if (authorIdx === -1) missing.push('Author');
+        if (categoryIdx === -1) missing.push('Category');
+        return send(res, 400, {
+          error: `Missing required column headers: ${missing.join(', ')}. The CSV must contain ONLY columns: Name, Author, Category.`
+        });
+      }
+
+      const entry = accountState(account.key);
+      const state = entry.state || (entry.state = defaultLibraryState());
+      state.books = Array.isArray(state.books) ? state.books : [];
+
+      let nextId = state.books.reduce((max, bk) => Math.max(max, Number(bk.id) || 0), 0) + 1;
+      let totalFound = 0;
+      let importedCount = 0;
+      let duplicateCount = 0;
+      let invalidCount = 0;
+      const errors = [];
+      const importedBooks = [];
+
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.every(col => !col || !String(col).trim())) continue;
+        totalFound++;
+
+        const name = String(row[nameIdx] || '').trim();
+        const author = String(row[authorIdx] || '').trim();
+        const category = String(row[categoryIdx] || '').trim();
+
+        if (!name) {
+          invalidCount++;
+          errors.push(`Row ${i + 1}: Missing book name.`);
+          continue;
+        }
+
+        // Duplicate check (by Title + Author case-insensitive)
+        const isDup = state.books.some(bk =>
+          String(bk.title || '').trim().toLowerCase() === name.toLowerCase() &&
+          String(bk.author || '').trim().toLowerCase() === author.toLowerCase()
+        ) || importedBooks.some(bk =>
+          bk.title.toLowerCase() === name.toLowerCase() &&
+          bk.author.toLowerCase() === author.toLowerCase()
+        );
+
+        if (isDup) {
+          duplicateCount++;
+          continue;
+        }
+
+        // Strict Requirement: Import ONLY Name, Author, Category.
+        // No fake ISBNs, publishers, descriptions, or accession numbers.
+        const newBook = {
+          id: nextId++,
+          title: name,
+          author: author || '',
+          category: category || 'General',
+          isbn: '',
+          publisher: '',
+          description: '',
+          shelf_location: '',
+          quantity: 1,
+          available: 1,
+          borrow_count: 0,
+          color1: '#510027',
+          color2: '#3d001e',
+          rating: 4.5,
+          published_year: null,
+          created_at: new Date().toISOString()
+        };
+
+        state.books.push(newBook);
+        importedBooks.push(newBook);
+        importedCount++;
+      }
+
+      entry.revision += 1;
+      await saveStore();
+
+      return send(res, 200, {
+        success: true,
+        totalFound,
+        importedCount,
+        duplicateCount,
+        invalidCount,
+        errors,
+        books: state.books
+      });
+    }
+
+    if (p === '/api/admin/books/metadata' && method === 'GET') {
+      const account = requireAdmin(req, res);
+      if (!account) return;
+      const rawIsbn = (url.searchParams.get('isbn') || '').trim();
+      const isbn = rawIsbn.replace(/[^0-9X]/gi, '');
+      if (!isbn) return send(res, 400, { error: 'ISBN is required.' });
+
+      let bookData = null;
+      // 1. Try Open Library
+      try {
+        const olUrl = `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&jscmd=data&format=json`;
+        const olRes = await fetchJson(olUrl);
+        const item = olRes ? olRes[`ISBN:${isbn}`] : null;
+        if (item) {
+          const authors = (item.authors || []).map(a => a.name).join(', ') || '';
+          const subjects = (item.subjects || []).map(s => s.name).slice(0, 3).join(', ') || '';
+          const publishers = (item.publishers || []).map(pub => pub.name).join(', ') || '';
+          bookData = {
+            title: item.title || '',
+            author: authors,
+            category: suggestAcademicCategory(item.title + ' ' + subjects),
+            publisher: publishers,
+            published_year: item.publish_date ? parseInt(item.publish_date.match(/\d{4}/)?.[0] || '', 10) || null : null,
+            description: item.notes || (typeof item.description === 'string' ? item.description : item.description?.value) || '',
+            isbn: rawIsbn
+          };
+        }
+      } catch (err) {
+        console.warn('Open Library lookup error:', err);
+      }
+
+      // 2. Fall back to Google Books API
+      if (!bookData || !bookData.title) {
+        try {
+          const gbUrl = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`;
+          const gbRes = await fetchJson(gbUrl);
+          const gbItem = gbRes?.items?.[0]?.volumeInfo;
+          if (gbItem) {
+            bookData = {
+              title: gbItem.title || '',
+              author: (gbItem.authors || []).join(', '),
+              category: suggestAcademicCategory((gbItem.categories || []).join(' ') + ' ' + (gbItem.title || '')),
+              publisher: gbItem.publisher || '',
+              published_year: gbItem.publishedDate ? parseInt(gbItem.publishedDate.substring(0, 4), 10) || null : null,
+              description: gbItem.description || '',
+              isbn: rawIsbn
+            };
+          }
+        } catch (err) {
+          console.warn('Google Books lookup error:', err);
+        }
+      }
+
+      if (!bookData || !bookData.title) {
+        return send(res, 404, { error: `No metadata found online for ISBN ${rawIsbn}. Please enter details manually.` });
+      }
+
+      return send(res, 200, { success: true, book: bookData });
+    }
+
+    if (p === '/api/admin/books/ocr' && method === 'POST') {
+      const account = requireAdmin(req, res);
+      if (!account) return;
+      const b = await readBody(req);
+      const rawText = String(b.text || '').trim();
+      if (!rawText) return send(res, 400, { error: 'Text content is required for OCR analysis.' });
+
+      const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 1);
+      const isNoise = l => /^(edition|volume|pearson|mcgraw|wiley|oxford|cambridge|press|isbn|copyright|all rights|published|reprint|third|fourth|fifth|first|second|\d+(st|nd|rd|th))\b/i.test(l);
+
+      const candidateTitles = [];
+      const candidateAuthors = [];
+
+      for (const line of lines) {
+        if (/^(by|author|dr\.|prof\.)\s+/i.test(line)) {
+          candidateAuthors.push(line.replace(/^(by|author:?)\s+/i, '').trim());
+        } else if (!isNoise(line)) {
+          candidateTitles.push(line);
+        }
+      }
+
+      const title = candidateTitles[0] || lines[0] || 'Untitled Scanned Book';
+      const author = candidateAuthors[0] || (candidateTitles.length > 1 ? candidateTitles[candidateTitles.length - 1] : 'Unknown Author');
+      const suggestedCategory = suggestAcademicCategory(rawText);
+
+      return send(res, 200, {
+        success: true,
+        title,
+        author,
+        category: suggestedCategory,
+        disclaimer: 'Scanned via AI OCR. Please verify details before saving.'
+      });
+    }
+
+    if (p === '/api/admin/books' && method === 'POST') {
+      const account = requireAdmin(req, res);
+      if (!account) return;
+      const b = await readBody(req);
+      const title = String(b.title || '').trim();
+      const author = String(b.author || '').trim();
+      const category = String(b.category || '').trim();
+      if (!title) return send(res, 400, { error: 'Book title is required.' });
+      if (!category) return send(res, 400, { error: 'Book category is required.' });
+
+      const entry = accountState(account.key);
+      const state = entry.state || (entry.state = defaultLibraryState());
+      state.books = Array.isArray(state.books) ? state.books : [];
+
+      let nextId = state.books.reduce((max, bk) => Math.max(max, Number(bk.id) || 0), 0) + 1;
+      const qty = Math.max(1, parseInt(b.quantity, 10) || 1);
+      const newBook = {
+        id: nextId,
+        title,
+        author: author || '',
+        category,
+        isbn: String(b.isbn || '').trim(),
+        publisher: String(b.publisher || '').trim(),
+        description: String(b.description || '').trim(),
+        shelf_location: String(b.shelf_location || '').trim(),
+        quantity: qty,
+        available: qty,
+        borrow_count: 0,
+        color1: b.color1 || '#510027',
+        color2: b.color2 || '#3d001e',
+        rating: parseFloat(b.rating) || 4.5,
+        published_year: parseInt(b.published_year, 10) || null,
+        created_at: new Date().toISOString()
+      };
+      state.books.push(newBook);
+      entry.revision += 1;
+      await saveStore();
+      return send(res, 201, { success: true, book: newBook, books: state.books });
     }
 
     // ========================== MESSAGES ===================================
@@ -910,11 +1276,37 @@ async function handleRequest(req, res) {
     if (p.startsWith('/api/')) return send(res, 404, { error: 'API endpoint not found.' });
 
     // ========================= STATIC FILES ================================
-    // Root path '/' serves login.html first so login opens first!
-    if (p === '/' || p === '' || p === '/login') {
+    // Root path '/' serves login.html first if unauthenticated, index.html if authenticated
+    if (p === '/' || p === '' || p === '/login' || p === '/login.html') {
+      const account = requestAccount(req);
+      if (p === '/login' || p === '/login.html') {
+        const asset = STATIC_ASSETS['/login.html'];
+        if (asset && fs.existsSync(asset.file)) {
+          return send(res, 200, fs.readFileSync(asset.file), asset.type, { 'Cache-Control': 'no-cache, no-store, must-revalidate' });
+        }
+      }
+      if (account) {
+        res.writeHead(302, { 'Location': '/index.html', 'Cache-Control': 'no-store, no-cache' });
+        res.end();
+        return;
+      }
       const asset = STATIC_ASSETS['/login.html'];
       if (asset && fs.existsSync(asset.file)) {
-        return send(res, 200, fs.readFileSync(asset.file), asset.type, { 'Cache-Control': 'no-cache' });
+        return send(res, 200, fs.readFileSync(asset.file), asset.type, { 'Cache-Control': 'no-cache, no-store, must-revalidate' });
+      }
+    }
+
+    // Direct access to /index.html is protected: unauthenticated users are redirected to /login.html
+    if (p === '/index.html' || p === '/index') {
+      const account = requestAccount(req);
+      if (!account) {
+        res.writeHead(302, {
+          'Location': '/login.html',
+          'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+          'Pragma': 'no-cache'
+        });
+        res.end();
+        return;
       }
     }
 

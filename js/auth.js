@@ -40,47 +40,19 @@
     let authUser = username;
     let loggedIn = false;
 
-    // 1. Try server login if running via http/https
+    // 1. Server login
     if (["http:", "https:"].includes(window.location.protocol)) {
-      try {
-        const response = await fetch(path, {
-          method: "POST",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, password })
-        });
-        const result = await readResponse(response, "Authentication failed.");
-        authUser = result.username || username;
-        loggedIn = true;
-      } catch (err) {
-        // If server actively returned a 401 error or user already exists error:
-        if (err.message && err.message.toLowerCase().includes("already exists")) {
-          throw err;
-        }
-        console.warn("Server auth failed or unreachable, checking credentials locally:", err);
-      }
-    }
-
-    // 2. Offline / Local fallback check (or if server is offline or file:// protocol)
-    if (!loggedIn) {
-      const u = String(username || "").trim().toLowerCase();
-      const p = String(password || "");
-      const accounts = getLocalAccounts();
-
-      if (u === "admin" && p === "admin123") {
-        authUser = "admin";
-        loggedIn = true;
-      } else if (accounts[u] && accounts[u].password === p) {
-        authUser = accounts[u].username || username;
-        loggedIn = true;
-      } else if (path.includes("register") || path.includes("setup")) {
-        accounts[u] = { username, password: p, isPrimary: Object.keys(accounts).length === 0 };
-        saveLocalAccounts(accounts);
-        authUser = username;
-        loggedIn = true;
-      } else {
-        throw new Error("Invalid username or password. (Default is admin / admin123)");
-      }
+      const response = await fetch(path, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      const result = await readResponse(response, "Authentication failed. Invalid username or password.");
+      authUser = result.username || username;
+      loggedIn = true;
+    } else {
+      throw new Error("Authentication requires a connection to the server.");
     }
 
     if (loggedIn) {
@@ -231,25 +203,10 @@
     heading.textContent = "Sign In";
     description.textContent = "Enter your username and password to access your library.";
 
-    // Fill default values if empty
-    const userField = document.getElementById("login-username");
-    const passField = document.getElementById("login-password");
-    if (userField && !userField.value) userField.value = "admin";
-    if (passField && !passField.value) passField.value = "admin123";
-
     if (new URLSearchParams(window.location.search).get("passwordChanged") === "1") {
       showMessage("Password updated. Sign in with your new password.", false);
     }
   }
-
-  // Quick fill button handler
-  document.getElementById("quick-fill-admin")?.addEventListener("click", () => {
-    const userField = document.getElementById("login-username");
-    const passField = document.getElementById("login-password");
-    if (userField) userField.value = "admin";
-    if (passField) passField.value = "admin123";
-    showMessage("Default admin credentials filled (admin / admin123)", false);
-  });
 
   setupForm.addEventListener("submit", async event => {
     event.preventDefault();
