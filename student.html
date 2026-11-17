@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-accent="dronacharya">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#16010b">
+  <title>Student Portal | DGI Central Library (CSIT)</title>
+  <link rel="icon" type="image/png" href="logo.png">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    :root {
+      --maroon-dark: #16010b;
+      --maroon-card: #250314;
+      --maroon-card-light: #36071f;
+      --gold-primary: #ffc500;
+      --gold-cream: #fff1cc;
+      --border-maroon: rgba(255, 197, 0, 0.22);
+      --success-green: #10b981;
+      --danger-red: #ef4444;
+      --text-muted: #d4b8c6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif; }
+    body {
+      background-color: var(--maroon-dark);
+      background-image: radial-gradient(circle at 50% 0%, #3e0422 0%, #16010b 75%);
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .portal-header {
+      background: rgba(37, 3, 20, 0.95);
+      border-bottom: 1px solid var(--border-maroon);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      backdrop-filter: blur(8px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .brand-logo {
+      height: 48px;
+      width: auto;
+      background: #fff;
+      padding: 4px 8px;
+      border-radius: 8px;
+    }
+    .brand-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: 0.5px;
+    }
+    .brand-sub {
+      font-size: 0.78rem;
+      color: var(--gold-primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 700;
+    }
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .btn-admin-link {
+      background: transparent;
+      border: 1px solid var(--gold-primary);
+      color: var(--gold-primary);
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-admin-link:hover {
+      background: var(--gold-primary);
+      color: #16010b;
+    }
+    .portal-main {
+      flex: 1;
+      max-width: 1100px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px 20px 40px;
+    }
+    .portal-hero {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .portal-hero h1 {
+      font-size: 2.1rem;
+      color: var(--gold-cream);
+      margin-bottom: 6px;
+      font-weight: 800;
+    }
+    .portal-hero p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+    .tab-nav {
+      display: flex;
+      gap: 8px;
+      background: rgba(37, 3, 20, 0.85);
+      padding: 6px;
+      border-radius: 12px;
+      border: 1px solid var(--border-maroon);
+      margin-bottom: 24px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px 16px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-weight: 700;
+      font-size: 0.92rem;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .tab-btn.is-active {
+      background: var(--gold-primary);
+      color: #16010b;
+      box-shadow: 0 4px 12px rgba(255, 197, 0, 0.3);
+    }
+    .card {
+      background: var(--maroon-card);
+      border: 1px solid var(--border-maroon);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 16px 36px rgba(0,0,0,0.4);
+      margin-bottom: 24px;
+    }
+    .search-box {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .search-input {
+      flex: 1;
+      background: rgba(22, 1, 11, 0.7);
+      border: 1px solid var(--border-maroon);
+      padding: 12px 18px;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 0.95rem;
+      outline: none;
+    }
+    .search-input:focus {
+      border-color: var(--gold-primary);
+      box-shadow: 0 0 0 3px rgba(255, 197, 0, 0.2);
+    }
+    .filter-pills {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 22px;
+    }
+    .filter-pill {
+      background: rgba(22, 1, 11, 0.6);
+      border: 1px solid rgba(255, 197, 0, 0.2);
+      color: var(--gold-cream);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .filter-pill:hover, .filter-pill.is-active {
+      background: rgba(255, 197, 0, 0.25);
+      border-color: var(--gold-primary);
+      color: var(--gold-primary);
+    }
+    .books-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 18px;
+    }
+    .book-card {
+      background: var(--maroon-card-light);
+      border: 1px solid rgba(255, 197, 0, 0.16);
+      border-radius: 12px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .book-card:hover {
+      transform: translateY(-3px);
+      border-color: var(--gold-primary);
+    }
+    .book-title {
+      font-size: 1.08rem;
+      font-weight: 700;
+      color: var(--gold-cream);
+      margin-bottom: 6px;
+      line-height: 1.35;
+    }
+    .book-author {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+    .book-meta {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 10px;
+      margin-top: 10px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+    .badge-available {
+      background: rgba(16, 185, 129, 0.18);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+    .badge-issued {
+      background: rgba(239, 68, 68, 0.18);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+    .badge-csit {
+      background: rgba(255, 197, 0, 0.18);
+      color: #ffc500;
+      border: 1px solid rgba(255, 197, 0, 0.4);
+    }
+    .stats-bar {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .stat-pill {
+      background: rgba(0,0,0,0.3);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      color: var(--gold-cream);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .stat-pill strong {
+      color: var(--gold-primary);
+    }
+    .student-lookup-form {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .btn-search {
+      background: var(--gold-primary);
+      color: #16010b;
+      font-weight: 700;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: opacity 0.2s;
+    }
+    .btn-search:hover {
+      opacity: 0.9;
+    }
+    .sample-chips {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+    .sample-chip {
+      background: rgba(255, 197, 0, 0.12);
+      border: 1px solid rgba(255, 197, 0, 0.25);
+      color: var(--gold-primary);
+      padding: 3px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 0.82rem;
+    }
+    .student-profile-banner {
+      background: linear-gradient(135deg, rgba(62, 4, 34, 0.8) 0%, rgba(37, 3, 20, 0.9) 100%);
+      border: 1px solid var(--border-maroon);
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .profile-info h3 {
+      font-size: 1.3rem;
+      color: var(--gold-cream);
+      margin-bottom: 4px;
+    }
+    .profile-info p {
+      color: var(--text-muted);
+      font-size: 0.88rem;
+    }
+    .profile-metrics {
+      display: flex;
+      gap: 16px;
+    }
+    .metric-box {
+      text-align: center;
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(255, 197, 0, 0.2);
+      border-radius: 10px;
+      padding: 10px 18px;
+      min-width: 90px;
+    }
+    .metric-number {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--gold-primary);
+    }
+    .metric-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .section-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--gold-cream);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .table-responsive {
+      overflow-x: auto;
+      margin-bottom: 24px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      text-align: left;
+    }
+    th {
+      background: rgba(0, 0, 0, 0.4);
+      color: var(--gold-primary);
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border-maroon);
+      font-weight: 700;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      color: #fff;
+    }
+    tr:hover td {
+      background: rgba(255, 197, 0, 0.04);
+    }
+    .empty-placeholder {
+      text-align: center;
+      padding: 36px 20px;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+    .footer {
+      text-align: center;
+      padding: 24px 20px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(22, 1, 11, 0.95);
+      line-height: 1.6;
+    }
+    .footer-credit {
+      margin-top: 8px;
+      color: var(--gold-primary);
+      font-size: 0.85rem;
+    }
+    @media (max-width: 680px) {
+      .portal-header { flex-direction: column; gap: 12px; align-items: flex-start; }
+      .search-box, .student-lookup-form { flex-direction: column; }
+      .student-profile-banner { flex-direction: column; align-items: flex-start; }
+      .books-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="portal-header">
+    <div class="brand-group">
+      <img class="brand-logo" src="assets/logo.png" alt="DGI Logo" onerror="this.onerror=null;this.src='logo.png';">
+      <div>
+        <div class="brand-title">DGI Central Library</div>
+        <div class="brand-sub">Student Portal &bull; CSIT & All Departments</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <a href="login.html" class="btn-admin-link">🔒 Librarian Admin Login</a>
+    </div>
+  </header>
+
+  <main class="portal-main">
+    <div class="portal-hero">
+      <h1>Student Library Portal</h1>
+      <p>Search library books, check real-time availability, and view your current loans and borrowing history.</p>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="tab-nav" role="tablist">
+      <button class="tab-btn is-active" id="tab-books-btn" onclick="switchTab('books')">
+        <span>📚</span> Book Catalog & Availability
+      </button>
+      <button class="tab-btn" id="tab-student-btn" onclick="switchTab('student')">
+        <span>🎓</span> My Issued Books & History
+      </button>
+    </div>
+
+    <!-- Tab 1: Book Catalog & Availability -->
+    <section id="tab-books" class="card">
+      <div class="search-box">
+        <input type="text" id="catalog-search" class="search-input" placeholder="Search by Book Title, Author, ISBN, or Subject (e.g. CSIT, Data Structures, Python)..." oninput="filterCatalog()">
+      </div>
+
+      <div class="filter-pills" id="category-pills">
+        <span class="filter-pill is-active" onclick="filterByDept('all')">All Books</span>
+        <span class="filter-pill" onclick="filterByDept('CSIT')">💻 CSIT</span>
+        <span class="filter-pill" onclick="filterByDept('Computer Science')">🖥️ Computer Science</span>
+        <span class="filter-pill" onclick="filterByDept('Information Technology')">🌐 IT</span>
+        <span class="filter-pill" onclick="filterByDept('Electronics')">⚡ Electronics</span>
+        <span class="filter-pill" onclick="filterByDept('Mechanical')">⚙️ Mechanical</span>
+        <span class="filter-pill" onclick="filterByDept('MBA')">📊 Management</span>
+      </div>
+
+      <div class="stats-bar">
+        <div class="stat-pill">Total Titles: <strong id="total-books-count">0</strong></div>
+        <div class="stat-pill">Available Copies on Shelf: <strong id="available-copies-count">0</strong></div>
+        <div class="stat-pill">Filtered Results: <strong id="filtered-books-count">0</strong></div>
+      </div>
+
+      <div class="books-grid" id="books-container">
+        <div class="empty-placeholder">Loading library catalog...</div>
+      </div>
+    </section>
+
+    <!-- Tab 2: My Issued Books & History -->
+    <section id="tab-student" class="card" style="display: none;">
+      <div class="section-title">🔍 Check Your Library Records</div>
+      <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 14px;">
+        Enter your College Roll Number to check which books are currently issued to you and all books borrowed till date.
+      </p>
+
+      <div class="student-lookup-form">
+        <input type="text" id="student-roll-input" class="search-input" placeholder="Enter Roll Number (e.g. CS101, 220133010001)...">
+        <button class="btn-search" onclick="lookupStudentStatus()">Check My Status</button>
+      </div>
+
+      <div class="sample-chips">
+        <span>Quick Samples:</span>
+        <span class="sample-chip" onclick="fillRoll('CS101')">CS101</span>
+        <span class="sample-chip" onclick="fillRoll('CS102')">CS102</span>
+        <span class="sample-chip" onclick="fillRoll('IT201')">IT201</span>
+        <span class="sample-chip" onclick="fillRoll('ME301')">ME301</span>
+      </div>
+
+      <!-- Student Results Area -->
+      <div id="student-result-area" style="display: none;">
+        <!-- Profile Banner -->
+        <div class="student-profile-banner">
+          <div class="profile-info">
+            <h3 id="student-display-name">Student Name</h3>
+            <p>Roll No: <strong id="student-display-roll" style="color:var(--gold-primary);">CS101</strong> &bull; Dept: <strong id="student-display-dept">CSIT</strong></p>
+          </div>
+          <div class="profile-metrics">
+            <div class="metric-box">
+              <div class="metric-number" id="metric-currently-issued">0</div>
+              <div class="metric-label">Books with You</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-number" id="metric-total-borrowed">0</div>
+              <div class="metric-label">Total Taken Till Date</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-number" id="metric-fine-due" style="color:#ef4444;">₹0</div>
+              <div class="metric-label">Fine Due</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 1. Currently Issued Books -->
+        <div class="section-title">📌 Books Currently in Your Possession (Abhi Aapke Pass Hain)</div>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Book Title</th>
+                <th>ISBN</th>
+                <th>Issue Date</th>
+                <th>Due Date</th>
+                <th>Days Remaining / Overdue</th>
+                <th>Current Fine</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="currently-issued-tbody">
+              <tr><td colspan="7" class="empty-placeholder">No books currently issued to this account.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 2. Total Borrowing History -->
+        <div class="section-title" style="margin-top: 30px;">📜 All Books Borrowed Till Date (Puri History)</div>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Tx ID</th>
+                <th>Book Title</th>
+                <th>Issue Date</th>
+                <th>Due Date</th>
+                <th>Return Date</th>
+                <th>Status</th>
+                <th>Fine Settlement</th>
+              </tr>
+            </thead>
+            <tbody id="history-tbody">
+              <tr><td colspan="7" class="empty-placeholder">No past loan records found.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div>Dronacharya Group of Institutions, Greater Noida &bull; Central Library Management System</div>
+    <div>#27, APJ Abdul Kalam Road, Knowledge Park-III, Greater Noida, Uttar Pradesh - 201306 &bull; Phone: 0120-2322022</div>
+    <div class="footer-credit">Designed and Developed by <strong>Ayush Gupta (CSIT)</strong></div>
+  </footer>
+
+  <script>
+    // State
+    let allBooks = [];
+    let currentDeptFilter = 'all';
+
+    // Tabs
+    function switchTab(tab) {
+      document.getElementById('tab-books-btn').classList.toggle('is-active', tab === 'books');
+      document.getElementById('tab-student-btn').classList.toggle('is-active', tab === 'student');
+      document.getElementById('tab-books').style.display = tab === 'books' ? 'block' : 'none';
+      document.getElementById('tab-student').style.display = tab === 'student' ? 'block' : 'none';
+    }
+
+    function fillRoll(roll) {
+      document.getElementById('student-roll-input').value = roll;
+      lookupStudentStatus();
+    }
+
+    // Load Books Catalog
+    async function loadBooks() {
+      try {
+        let loaded = false;
+        if (["http:", "https:"].includes(window.location.protocol)) {
+          const res = await fetch('/api/student/books');
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data.books)) {
+              allBooks = data.books;
+              loaded = true;
+            }
+          }
+        }
+        if (!loaded) {
+          // Local fallback from localStorage
+          const localState = localStorage.getItem('dgi_library_db_v1');
+          if (localState) {
+            const parsed = JSON.parse(localState);
+            if (Array.isArray(parsed.books)) {
+              allBooks = parsed.books.map(b => ({
+                id: b.id,
+                title: b.title,
+                author: b.author,
+                isbn: b.isbn,
+                category: b.category,
+                shelf_location: b.shelf_location,
+                total_copies: Number(b.total_copies) || 1,
+                available_copies: Number(b.available_copies) >= 0 ? Number(b.available_copies) : (Number(b.total_copies) || 1)
+              }));
+              loaded = true;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Could not load books from API, using defaults:', err);
+      }
+
+      // Default sample books if empty
+      if (!allBooks || allBooks.length === 0) {
+        allBooks = [
+          { id: 1, title: "Data Structures & Algorithms in C++", author: "Mark Allen Weiss", isbn: "978-0132847377", category: "CSIT", shelf_location: "Stack CS-101", total_copies: 5, available_copies: 3 },
+          { id: 2, title: "Database System Concepts", author: "Silberschatz, Korth", isbn: "978-0078022159", category: "CSIT", shelf_location: "Stack CS-102", total_copies: 6, available_copies: 0 },
+          { id: 3, title: "Operating System Concepts", author: "Abraham Silberschatz", isbn: "978-1118063330", category: "CSIT", shelf_location: "Stack CS-103", total_copies: 4, available_copies: 2 },
+          { id: 4, title: "Computer Networks", author: "Andrew S. Tanenbaum", isbn: "978-0132126953", category: "CSIT", shelf_location: "Stack CS-104", total_copies: 5, available_copies: 4 },
+          { id: 5, title: "Artificial Intelligence: A Modern Approach", author: "Stuart Russell, Peter Norvig", isbn: "978-0136042594", category: "CSIT", shelf_location: "Stack CS-105", total_copies: 3, available_copies: 1 },
+          { id: 6, title: "Web Technologies: HTML, CSS, JS", author: "Uttam K. Roy", isbn: "978-0198066224", category: "Information Technology", shelf_location: "Stack IT-201", total_copies: 4, available_copies: 3 },
+          { id: 7, title: "Electronic Devices & Circuit Theory", author: "Boylestad", isbn: "978-0137692828", category: "Electronics", shelf_location: "Stack EC-301", total_copies: 3, available_copies: 0 },
+          { id: 8, title: "Engineering Mechanics", author: "S. Timoshenko", isbn: "978-0070616806", category: "Mechanical", shelf_location: "Stack ME-401", total_copies: 5, available_copies: 4 }
+        ];
+      }
+
+      renderCatalog(allBooks);
+    }
+
+    function renderCatalog(books) {
+      const container = document.getElementById('books-container');
+      const totalCount = books.length;
+      let availableCopies = 0;
+      books.forEach(b => { availableCopies += (Number(b.available_copies) || 0); });
+
+      document.getElementById('total-books-count').textContent = allBooks.length;
+      document.getElementById('available-copies-count').textContent = availableCopies;
+      document.getElementById('filtered-books-count').textContent = totalCount;
+
+      if (!books.length) {
+        container.innerHTML = `<div class="empty-placeholder">No books found matching your search.</div>`;
+        return;
+      }
+
+      container.innerHTML = books.map(book => {
+        const isAvail = Number(book.available_copies) > 0;
+        const isCsit = String(book.category || "").toLowerCase().includes("csit") || String(book.category || "").toLowerCase().includes("computer");
+        return `
+          <div class="book-card">
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:8px;">
+                <span class="badge ${isCsit ? 'badge-csit' : 'stat-pill'}" style="font-size:0.7rem; padding:2px 8px;">${book.category || "General"}</span>
+                <span class="badge ${isAvail ? 'badge-available' : 'badge-issued'}">
+                  ${isAvail ? `🟢 Available (${book.available_copies} copies)` : '🔴 Currently Issued'}
+                </span>
+              </div>
+              <div class="book-title">${escapeHTML(book.title)}</div>
+              <div class="book-author">By ${escapeHTML(book.author || "Unknown Author")}</div>
+            </div>
+            <div class="book-meta">
+              <span>ISBN: <strong>${escapeHTML(book.isbn || "N/A")}</strong></span>
+              <span>Shelf: <strong>${escapeHTML(book.shelf_location || "Central Rack")}</strong></span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function filterByDept(dept) {
+      currentDeptFilter = dept;
+      document.querySelectorAll('.filter-pill').forEach(pill => {
+        pill.classList.toggle('is-active', pill.textContent.includes(dept) || (dept === 'all' && pill.textContent.includes('All')));
+      });
+      filterCatalog();
+    }
+
+    function filterCatalog() {
+      const query = document.getElementById('catalog-search').value.toLowerCase().trim();
+      const filtered = allBooks.filter(book => {
+        const matchesQuery = !query ||
+          (book.title && book.title.toLowerCase().includes(query)) ||
+          (book.author && book.author.toLowerCase().includes(query)) ||
+          (book.isbn && book.isbn.toLowerCase().includes(query)) ||
+          (book.category && book.category.toLowerCase().includes(query));
+
+        let matchesDept = true;
+        if (currentDeptFilter !== 'all') {
+          matchesDept = book.category && book.category.toLowerCase().includes(currentDeptFilter.toLowerCase());
+        }
+
+        return matchesQuery && matchesDept;
+      });
+      renderCatalog(filtered);
+    }
+
+    // Student Status & Loan History Lookup
+    async function lookupStudentStatus() {
+      const rollInput = document.getElementById('student-roll-input').value.trim();
+      if (!rollInput) {
+        alert("Please enter a roll number (e.g. CS101)");
+        return;
+      }
+
+      let data = null;
+      if (["http:", "https:"].includes(window.location.protocol)) {
+        try {
+          const res = await fetch(`/api/student/status?roll_no=${encodeURIComponent(rollInput)}`);
+          if (res.ok) {
+            data = await res.json();
+          }
+        } catch (e) {
+          console.warn("API student lookup failed, trying local store:", e);
+        }
+      }
+
+      // Local fallback lookup
+      if (!data) {
+        const raw = localStorage.getItem('dgi_library_db_v1');
+        if (raw) {
+          try {
+            const db = JSON.parse(raw);
+            const student = (db.students || []).find(s => String(s.roll_no || "").trim().toLowerCase() === rollInput.toLowerCase());
+            if (student) {
+              const studentTx = (db.transactions || []).filter(t => Number(t.student_id) === Number(student.id));
+              const currentlyIssued = studentTx.filter(t => t.status === 'issued');
+              data = {
+                student: {
+                  id: student.id,
+                  name: student.name,
+                  roll_no: student.roll_no,
+                  department: student.department || 'CSIT',
+                  email: student.email,
+                  phone: student.phone
+                },
+                currently_issued: currentlyIssued,
+                history: studentTx,
+                total_borrowed_count: studentTx.length,
+                current_issued_count: currentlyIssued.length
+              };
+            }
+          } catch (e) {}
+        }
+      }
+
+      // Mock demo data if roll number is sample (e.g. CS101) and DB has no record
+      if (!data && rollInput.toUpperCase() === 'CS101') {
+        data = {
+          student: { id: 1, name: "Aarav Sharma", roll_no: "CS101", department: "CSIT", email: "aarav.csit@dronacharya.info" },
+          currently_issued: [
+            { id: 101, book_title: "Database System Concepts", book_isbn: "978-0078022159", issue_date: "2026-11-05", due_date: "2026-11-19", fine: 0, status: "issued" }
+          ],
+          history: [
+            { id: 101, book_title: "Database System Concepts", book_isbn: "978-0078022159", issue_date: "2026-11-05", due_date: "2026-11-19", return_date: null, status: "issued", fine: 0 },
+            { id: 82, book_title: "Data Structures in C++", book_isbn: "978-0132847377", issue_date: "2026-10-10", due_date: "2026-10-24", return_date: "2026-10-22", status: "returned", fine: 0 },
+            { id: 64, book_title: "Operating Systems Principles", book_isbn: "978-1118063330", issue_date: "2026-09-01", due_date: "2026-09-15", return_date: "2026-09-14", status: "returned", fine: 0 }
+          ],
+          total_borrowed_count: 3,
+          current_issued_count: 1
+        };
+      }
+
+      const resultArea = document.getElementById('student-result-area');
+      if (!data || !data.student) {
+        alert(`No student found with Roll Number '${rollInput}'. Try CS101 or check with the librarian.`);
+        resultArea.style.display = 'none';
+        return;
+      }
+
+      resultArea.style.display = 'block';
+
+      // Fill profile
+      document.getElementById('student-display-name').textContent = data.student.name;
+      document.getElementById('student-display-roll').textContent = data.student.roll_no;
+      document.getElementById('student-display-dept').textContent = data.student.department || 'CSIT';
+
+      const currentBooks = data.currently_issued || [];
+      const historyBooks = data.history || [];
+
+      let totalFineDue = 0;
+      const today = new Date();
+      today.setHours(0,0,0,0);
+
+      currentBooks.forEach(tx => {
+        if (tx.due_date) {
+          const dueDate = new Date(tx.due_date + "T00:00:00");
+          if (today > dueDate) {
+            const daysLate = Math.ceil((today - dueDate) / (1000 * 60 * 60 * 24));
+            totalFineDue += (daysLate * 5);
+          }
+        }
+      });
+
+      document.getElementById('metric-currently-issued').textContent = currentBooks.length;
+      document.getElementById('metric-total-borrowed').textContent = historyBooks.length;
+      document.getElementById('metric-fine-due').textContent = `₹${totalFineDue}`;
+
+      // 1. Render Currently Issued Books
+      const currentTbody = document.getElementById('currently-issued-tbody');
+      if (!currentBooks.length) {
+        currentTbody.innerHTML = `<tr><td colspan="7" class="empty-placeholder">🟢 No books currently issued. You have 0 active loans!</td></tr>`;
+      } else {
+        currentTbody.innerHTML = currentBooks.map(tx => {
+          let daysText = "-";
+          let fineText = "₹0.00";
+          if (tx.due_date) {
+            const due = new Date(tx.due_date + "T00:00:00");
+            const diffDays = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+            if (diffDays > 0) {
+              daysText = `<span class="badge badge-available">${diffDays} days left</span>`;
+            } else if (diffDays === 0) {
+              daysText = `<span class="badge badge-csit">Due Today!</span>`;
+            } else {
+              const late = Math.abs(diffDays);
+              daysText = `<span class="badge badge-issued">⚠️ Overdue by ${late} day(s)</span>`;
+              fineText = `<strong style="color:#ef4444;">₹${late * 5}.00</strong>`;
+            }
+          }
+          return `
+            <tr>
+              <td><strong>${escapeHTML(tx.book_title || "Library Book")}</strong></td>
+              <td><code>${escapeHTML(tx.book_isbn || "N/A")}</code></td>
+              <td>${tx.issue_date || "-"}</td>
+              <td><strong style="color:var(--gold-cream);">${tx.due_date || "-"}</strong></td>
+              <td>${daysText}</td>
+              <td>${fineText}</td>
+              <td>
+                <a href="reissue.html" target="_blank" style="color:var(--gold-primary); text-decoration:underline; font-size:0.8rem; font-weight:700;">Request Extension</a>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      // 2. Render Total Borrowing History
+      const historyTbody = document.getElementById('history-tbody');
+      if (!historyBooks.length) {
+        historyTbody.innerHTML = `<tr><td colspan="7" class="empty-placeholder">No borrowing history recorded yet.</td></tr>`;
+      } else {
+        historyTbody.innerHTML = historyBooks.map((tx, idx) => {
+          const isReturned = tx.status === 'returned';
+          return `
+            <tr>
+              <td>#${tx.id || (idx + 1)}</td>
+              <td><strong>${escapeHTML(tx.book_title || "Library Book")}</strong></td>
+              <td>${tx.issue_date || "-"}</td>
+              <td>${tx.due_date || "-"}</td>
+              <td>${tx.return_date ? `<span style="color:#34d399;">${tx.return_date}</span>` : '<span style="color:#f87171;">Still Issued</span>'}</td>
+              <td>
+                <span class="badge ${isReturned ? 'badge-available' : 'badge-issued'}">
+                  ${isReturned ? 'Returned' : 'Currently Active'}
+                </span>
+              </td>
+              <td>${Number(tx.fine || 0) > 0 ? `₹${tx.fine} (Settled)` : '₹0 (Clear)'}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
+
+    function escapeHTML(str) {
+      if (!str) return "";
+      return String(str).replace(/[&<>'"]/g, tag => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+      }[tag] || tag));
+    }
+
+    // Init
+    loadBooks();
+  </script>
+</body>
+</html>

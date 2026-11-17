@@ -1,14 +1,5 @@
 {
   "name": "dgi-library-management-system",
   "version": "1.0.0",
-  "private": true,
-  "engines": {
-    "node": ">=20"
-  },
-  "scripts": {
-    "start": "node server.js"
-  },
-  "dependencies": {
-    "@vercel/blob": "^2.3.0"
-  }
+  "private": true
 }

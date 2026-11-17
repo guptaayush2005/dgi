@@ -243,6 +243,57 @@ async function handleRequest(req, res) {
   const method = req.method;
 
   try {
+    // ============================ STUDENT PORTAL API =======================
+    if (p === '/api/student/books' && method === 'GET') {
+      const primaryKey = (store.accounts.find(a => a.isPrimary) || store.accounts[0] || {}).key || 'admin';
+      const state = (store.states[primaryKey] || {}).state || {};
+      const books = Array.isArray(state.books) ? state.books : [];
+      const publicBooks = books.map(b => ({
+        id: b.id,
+        title: b.title,
+        author: b.author,
+        isbn: b.isbn,
+        category: b.category,
+        shelf_location: b.shelf_location,
+        total_copies: Number(b.total_copies) || 1,
+        available_copies: Number(b.available_copies) >= 0 ? Number(b.available_copies) : (Number(b.total_copies) || 1)
+      }));
+      return send(res, 200, { books: publicBooks });
+    }
+
+    if (p === '/api/student/status' && method === 'GET') {
+      const rollNo = (url.searchParams.get('roll_no') || '').trim().toLowerCase();
+      if (!rollNo) return send(res, 400, { error: 'Roll number is required.' });
+
+      const primaryKey = (store.accounts.find(a => a.isPrimary) || store.accounts[0] || {}).key || 'admin';
+      const state = (store.states[primaryKey] || {}).state || {};
+      const students = Array.isArray(state.students) ? state.students : [];
+      const transactions = Array.isArray(state.transactions) ? state.transactions : [];
+
+      const student = students.find(s => String(s.roll_no || '').trim().toLowerCase() === rollNo);
+      if (!student) {
+        return send(res, 404, { error: `Student with Roll Number '${url.searchParams.get('roll_no')}' not found.` });
+      }
+
+      const studentTx = transactions.filter(t => Number(t.student_id) === Number(student.id));
+      const currentlyIssued = studentTx.filter(t => t.status === 'issued');
+
+      return send(res, 200, {
+        student: {
+          id: student.id,
+          name: student.name,
+          roll_no: student.roll_no,
+          department: student.department || 'CSIT',
+          email: student.email,
+          phone: student.phone
+        },
+        currently_issued: currentlyIssued,
+        history: studentTx,
+        total_borrowed_count: studentTx.length,
+        current_issued_count: currentlyIssued.length
+      });
+    }
+
     // ============================ AUTH =====================================
     if (p === '/api/auth/status' && method === 'GET') {
       const account = requestAccount(req);
