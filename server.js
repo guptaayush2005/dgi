@@ -46,6 +46,24 @@ const MIME = {
   '.txt': 'text/plain; charset=utf-8'
 };
 
+// Static assets explicitly mapped for @vercel/nft bundler trace
+const STATIC_ASSETS = {
+  '/logo.png': { file: path.join(__dirname, 'logo.png'), type: 'image/png' },
+  '/assets/logo.png': { file: path.join(__dirname, 'assets', 'logo.png'), type: 'image/png' },
+  '/assets/logo-emblem.png': { file: path.join(__dirname, 'assets', 'logo-emblem.png'), type: 'image/png' },
+  '/css/style.css': { file: path.join(__dirname, 'css', 'style.css'), type: 'text/css; charset=utf-8' },
+  '/js/auth.js': { file: path.join(__dirname, 'js', 'auth.js'), type: 'text/javascript; charset=utf-8' },
+  '/js/app.js': { file: path.join(__dirname, 'js', 'app.js'), type: 'text/javascript; charset=utf-8' },
+  '/js/db.js': { file: path.join(__dirname, 'js', 'db.js'), type: 'text/javascript; charset=utf-8' },
+  '/js/charts.js': { file: path.join(__dirname, 'js', 'charts.js'), type: 'text/javascript; charset=utf-8' },
+  '/js/qr.js': { file: path.join(__dirname, 'js', 'qr.js'), type: 'text/javascript; charset=utf-8' },
+  '/js/xlsx_import.js': { file: path.join(__dirname, 'js', 'xlsx_import.js'), type: 'text/javascript; charset=utf-8' },
+  '/login.html': { file: path.join(__dirname, 'login.html'), type: 'text/html; charset=utf-8' },
+  '/student.html': { file: path.join(__dirname, 'student.html'), type: 'text/html; charset=utf-8' },
+  '/index.html': { file: path.join(__dirname, 'index.html'), type: 'text/html; charset=utf-8' },
+  '/reissue.html': { file: path.join(__dirname, 'reissue.html'), type: 'text/html; charset=utf-8' }
+};
+
 // ---------------------------------------------------------------------------
 // Password hashing (scrypt, built into Node — no dependencies)
 // ---------------------------------------------------------------------------
@@ -867,6 +885,14 @@ async function handleRequest(req, res) {
     if (p.startsWith('/api/')) return send(res, 404, { error: 'API endpoint not found.' });
 
     // ========================= STATIC FILES ================================
+    const norm = p.startsWith('/') ? p : '/' + p;
+    if (STATIC_ASSETS[norm] && fs.existsSync(STATIC_ASSETS[norm].file)) {
+      const asset = STATIC_ASSETS[norm];
+      const headers = { 'Content-Type': asset.type };
+      if (asset.type.startsWith('text/html')) headers['Cache-Control'] = 'no-cache';
+      return send(res, 200, fs.readFileSync(asset.file), asset.type, headers);
+    }
+
     let cleanPath = decodeURIComponent(p);
     if (cleanPath.startsWith('/')) cleanPath = cleanPath.slice(1);
     let full = path.join(ROOT, cleanPath || 'index.html');
