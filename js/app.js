@@ -6,6 +6,9 @@
 class DGIApp {
   constructor() {
     this.currentView = "dashboard";
+    this.catalogMode = "subjects";
+    this.activeSubjectId = null;
+    this.pendingDeleteSubjectId = null;
     this.activeAlertTab = "overdue"; // 'overdue' | 'dueSoon'
     this.selectedBookForIssue = null;
     this.selectedStudentForIssue = null;
@@ -421,8 +424,26 @@ class DGIApp {
   }
 
   renderBooks() {
+    // Populate subject filter dropdown in table view
+    const subjectFilterSelect = document.getElementById("books-subject-filter-select");
+    if (subjectFilterSelect) {
+      const currentSub = subjectFilterSelect.value || "all";
+      const subjects = window.db.getSubjects ? window.db.getSubjects() : [];
+      subjectFilterSelect.innerHTML = `<option value="all">All Subjects</option>` +
+        subjects.map(s => `<option value="${s.subject_id}" ${currentSub === String(s.subject_id) ? "selected" : ""}>${this.escapeHTML(s.subject_name)}</option>`).join("");
+    }
+
+    if (this.catalogMode === "subjects") {
+      if (this.activeSubjectId) {
+        this.renderSubjectBooksTable();
+      } else {
+        this.renderSubjectsCards();
+      }
+    }
+
     const searchVal = (document.getElementById("books-search-input")?.value || "").toLowerCase().trim();
     const availVal = document.getElementById("books-avail-select")?.value || "all";
+    const subVal = document.getElementById("books-subject-filter-select")?.value || "all";
 
     const allBooks = window.db.getBooks();
     this.renderBranchFilter(allBooks);
@@ -440,10 +461,14 @@ class DGIApp {
     const catVal = document.getElementById("books-category-select")?.value || "all";
     let books = branchBooks;
 
+    if (subVal !== "all") {
+      books = books.filter(b => Number(b.subject_id) === Number(subVal));
+    }
+
     // Apply filters
     if (searchVal) {
       books = books.filter(b => 
-        String(b.title || "").toLowerCase().includes(searchVal) ||
+        String(b.title || b.book_name || "").toLowerCase().includes(searchVal) ||
         String(b.author || "").toLowerCase().includes(searchVal) ||
         String(b.publisher || "").toLowerCase().includes(searchVal) ||
         String(b.isbn || "").toLowerCase().includes(searchVal) ||
@@ -452,18 +477,433 @@ class DGIApp {
     }
 
     if (catVal !== "all") {
-      books = books.filter(b => b.category.toLowerCase() === catVal.toLowerCase());
+      books = books.filter(b => (b.category || "").toLowerCase() === catVal.toLowerCase());
     }
 
     if (availVal === "available") {
-      books = books.filter(b => b.available > 0);
+      books = books.filter(b => (b.available ?? b.available_copies ?? 0) > 0);
     } else if (availVal === "out_of_stock") {
-      books = books.filter(b => b.available === 0);
+      books = books.filter(b => (b.available ?? b.available_copies ?? 0) === 0);
     }
 
     const tableContainer = document.getElementById("books-table-view-container");
     if (tableContainer) tableContainer.style.display = "block";
     this.renderBooksTable(books);
+  }
+
+  toggleCatalogMode(mode) {
+    this.catalogMode = mode;
+    const subjectsContainer = document.getElementById("catalog-subjects-container");
+    const detailContainer = document.getElementById("catalog-subject-detail-container");
+    const allTableContainer = document.getElementById("catalog-all-books-container");
+    const btnSubjects = document.getElementById("catalog-mode-subjects");
+    const btnTable = document.getElementById("catalog-mode-table");
+
+    if (mode === "subjects") {
+      if (this.activeSubjectId) {
+        if (subjectsContainer) subjectsContainer.style.display = "none";
+        if (detailContainer) detailContainer.style.display = "block";
+        this.renderSubjectBooksTable();
+      } else {
+        if (subjectsContainer) subjectsContainer.style.display = "block";
+        if (detailContainer) detailContainer.style.display = "none";
+        this.renderSubjectsCards();
+      }
+      if (allTableContainer) allTableContainer.style.display = "none";
+      if (btnSubjects) { btnSubjects.className = "btn btn-primary btn-sm"; }
+      if (btnTable) { btnTable.className = "btn btn-secondary btn-sm"; }
+    } else {
+      if (subjectsContainer) subjectsContainer.style.display = "none";
+      if (detailContainer) detailContainer.style.display = "none";
+      if (allTableContainer) allTableContainer.style.display = "block";
+      if (btnSubjects) { btnSubjects.className = "btn btn-secondary btn-sm"; }
+      if (btnTable) { btnTable.className = "btn btn-primary btn-sm"; }
+      this.renderBooks();
+    }
+  }
+
+  backToSubjects() {
+    this.activeSubjectId = null;
+    const subjectsContainer = document.getElementById("catalog-subjects-container");
+    const detailContainer = document.getElementById("catalog-subject-detail-container");
+    if (subjectsContainer) subjectsContainer.style.display = "block";
+    if (detailContainer) detailContainer.style.display = "none";
+    this.renderSubjectsCards();
+  }
+
+  openSubjectDetail(subjectId) {
+    const subId = Number(subjectId);
+    const subject = window.db.getSubjectById ? window.db.getSubjectById(subId) : null;
+    if (!subject) {
+      this.showToast("Error", "Subject not found", "danger");
+      return;
+    }
+    this.activeSubjectId = subId;
+    this.catalogMode = "subjects";
+
+    const subjectsContainer = document.getElementById("catalog-subjects-container");
+    const detailContainer = document.getElementById("catalog-subject-detail-container");
+    const allTableContainer = document.getElementById("catalog-all-books-container");
+    if (subjectsContainer) subjectsContainer.style.display = "none";
+    if (allTableContainer) allTableContainer.style.display = "none";
+    if (detailContainer) detailContainer.style.display = "block";
+
+    // Populate hero banner
+    const nameEl = document.getElementById("subject-detail-name");
+    const codeEl = document.getElementById("subject-detail-code-badge");
+    const descEl = document.getElementById("subject-detail-desc");
+    const iconEl = document.getElementById("subject-detail-icon");
+    const breadcrumbEl = document.getElementById("subject-detail-breadcrumb");
+
+    if (nameEl) nameEl.textContent = subject.subject_name;
+    if (breadcrumbEl) breadcrumbEl.textContent = subject.subject_name;
+    if (codeEl) {
+      codeEl.textContent = subject.subject_code || "GEN";
+      codeEl.style.display = subject.subject_code ? "inline-block" : "none";
+    }
+    if (descEl) descEl.textContent = subject.description || "Comprehensive subject domain and textbook collection.";
+    if (iconEl) iconEl.textContent = subject.icon || "📚";
+
+    // Reset filters
+    const searchInput = document.getElementById("subject-books-search-input");
+    if (searchInput) searchInput.value = "";
+    const availSelect = document.getElementById("subject-books-avail-select");
+    if (availSelect) availSelect.value = "all";
+    const sortSelect = document.getElementById("subject-books-sort-select");
+    if (sortSelect) sortSelect.value = "name_asc";
+
+    // Populate author dropdown for this subject
+    const books = window.db.getBooksBySubjectId ? window.db.getBooksBySubjectId(subId) : window.db.getBooks().filter(b => Number(b.subject_id) === subId);
+    const authorSelect = document.getElementById("subject-books-author-select");
+    if (authorSelect) {
+      const authors = [...new Set(books.map(b => (b.author || "").trim()).filter(Boolean))].sort();
+      authorSelect.innerHTML = `<option value="all">All Authors (${authors.length})</option>` +
+        authors.map(a => `<option value="${this.escapeHTML(a)}">${this.escapeHTML(a)}</option>`).join("");
+    }
+
+    this.renderSubjectBooksTable();
+  }
+
+  renderSubjectBooksTable() {
+    if (!this.activeSubjectId) return;
+    const tbody = document.getElementById("subject-books-table-tbody");
+    if (!tbody) return;
+
+    const subId = Number(this.activeSubjectId);
+    let books = window.db.getBooksBySubjectId ? window.db.getBooksBySubjectId(subId) : window.db.getBooks().filter(b => Number(b.subject_id) === subId);
+
+    const searchVal = (document.getElementById("subject-books-search-input")?.value || "").toLowerCase().trim();
+    const authorVal = document.getElementById("subject-books-author-select")?.value || "all";
+    const availVal = document.getElementById("subject-books-avail-select")?.value || "all";
+    const sortVal = document.getElementById("subject-books-sort-select")?.value || "name_asc";
+
+    // Filter
+    if (searchVal) {
+      books = books.filter(b =>
+        String(b.title || b.book_name || "").toLowerCase().includes(searchVal) ||
+        String(b.author || "").toLowerCase().includes(searchVal) ||
+        String(b.publisher || "").toLowerCase().includes(searchVal) ||
+        String(b.isbn || "").toLowerCase().includes(searchVal)
+      );
+    }
+
+    if (authorVal !== "all") {
+      books = books.filter(b => String(b.author || "").trim().toLowerCase() === authorVal.toLowerCase());
+    }
+
+    if (availVal === "available") {
+      books = books.filter(b => (b.available ?? b.available_copies ?? 0) > 0);
+    } else if (availVal === "out_of_stock") {
+      books = books.filter(b => (b.available ?? b.available_copies ?? 0) === 0);
+    }
+
+    // Sort
+    books.sort((a, b) => {
+      const titleA = String(a.title || a.book_name || "").toLowerCase();
+      const titleB = String(b.title || b.book_name || "").toLowerCase();
+      const availA = Number(a.available ?? a.available_copies ?? 0);
+      const availB = Number(b.available ?? b.available_copies ?? 0);
+      const qtyA = Number(a.quantity ?? a.total_copies ?? 0);
+      const qtyB = Number(b.quantity ?? b.total_copies ?? 0);
+
+      if (sortVal === "name_desc") return titleB.localeCompare(titleA);
+      if (sortVal === "copies_desc") return qtyB - qtyA;
+      if (sortVal === "avail_desc") return availB - availA;
+      return titleA.localeCompare(titleB);
+    });
+
+    if (books.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 40px; color: var(--text-muted);">
+        <div style="font-size: 32px; margin-bottom: 8px;">📚</div>
+        <div style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">No books found in this subject matching your search/filters.</div>
+        <div style="font-size: 13px; margin-bottom: 14px;">You can add books to this subject or clear your filter criteria.</div>
+        <button class="btn btn-primary btn-sm" onclick="window.app.openAddBookForCurrentSubject()">+ Add Book to this Subject</button>
+      </td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = books.map(b => {
+      const available = Number(b.available ?? b.available_copies ?? 0);
+      const total = Number(b.quantity ?? b.total_copies ?? 0);
+      const bookTitle = b.title || b.book_name || "Untitled Book";
+      const year = b.publication_year || b.published_year || "";
+      return `
+        <tr>
+          <td>
+            <div class="book-title-cell">
+              <div class="book-mini-cover" style="background: linear-gradient(135deg, ${this.safeBookColor(b.color1)}, ${this.safeBookColor(b.color2)});">
+                📖
+              </div>
+              <div>
+                <div class="book-meta-primary">${this.escapeHTML(bookTitle)}</div>
+                <div class="book-meta-sub">ID: #${b.book_id || b.id} ${year ? `| Year: ${this.escapeHTML(year)}` : ""} ${b.category ? `| ${this.escapeHTML(b.category)}` : ""}</div>
+              </div>
+            </div>
+          </td>
+          <td><strong>${this.escapeHTML(b.author || "Unknown")}</strong></td>
+          <td>${this.escapeHTML(b.publisher || "—")}</td>
+          <td><span class="isbn-code">${this.escapeHTML(b.isbn || "—")}</span></td>
+          <td>
+            <span style="font-weight: 800; font-size: 15px; color: ${available > 0 ? 'var(--success)' : 'var(--danger)'};">${available}</span>
+            <span style="color: var(--text-muted); font-size: 13px;"> / ${total}</span>
+          </td>
+          <td>
+            ${available > 0 
+              ? `<span class="badge badge-success">Available</span>` 
+              : `<span class="badge badge-danger">Out of Stock</span>`}
+          </td>
+          <td>
+            <div class="action-btn-group">
+              <button class="btn btn-secondary btn-sm btn-icon-only" title="Edit Book" onclick="window.app.openEditBookModal(${b.id})">✏️</button>
+              <button class="btn btn-primary btn-sm" ${available === 0 ? 'disabled style="opacity:0.5;"' : ''} onclick="window.app.quickIssueBook(${b.id})">Issue</button>
+              <button class="btn btn-danger btn-sm btn-icon-only" title="Delete Book" onclick="window.app.deleteBook(${b.id})">🗑️</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join("");
+  }
+
+  renderSubjectsCards() {
+    const container = document.getElementById("subjects-cards-grid");
+    if (!container) return;
+
+    const subjects = window.db.getSubjects ? window.db.getSubjects() : [];
+    const allBooks = window.db.getBooks ? window.db.getBooks() : [];
+
+    // Update overall KPIs
+    const totalSubjectsEl = document.getElementById("kpi-subjects-count");
+    const totalTitlesEl = document.getElementById("kpi-subject-titles-count");
+    const totalCopiesEl = document.getElementById("kpi-subject-copies-count");
+    if (totalSubjectsEl) totalSubjectsEl.textContent = subjects.length;
+    if (totalTitlesEl) totalTitlesEl.textContent = allBooks.length;
+    const totalCopies = allBooks.reduce((sum, b) => sum + Number(b.quantity ?? b.total_copies ?? 0), 0);
+    if (totalCopiesEl) totalCopiesEl.textContent = totalCopies;
+
+    // Filter subjects by search input
+    const searchVal = (document.getElementById("subjects-search-input")?.value || "").toLowerCase().trim();
+    let filtered = subjects;
+    if (searchVal) {
+      filtered = subjects.filter(s =>
+        String(s.subject_name || "").toLowerCase().includes(searchVal) ||
+        String(s.subject_code || "").toLowerCase().includes(searchVal) ||
+        String(s.description || "").toLowerCase().includes(searchVal)
+      );
+    }
+
+    if (filtered.length === 0) {
+      container.innerHTML = `
+        <div style="grid-column: 1/-1; text-align: center; padding: 50px 20px; background: var(--bg-card); border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
+          <div style="font-size: 36px; margin-bottom: 10px;">🔍</div>
+          <div style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">No subjects found</div>
+          <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">Try another search term or create a new subject domain.</div>
+          <button class="btn btn-primary btn-sm" onclick="window.app.openAddSubjectModal()">+ Add New Subject</button>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = filtered.map(s => {
+      const subBooks = allBooks.filter(b => Number(b.subject_id) === Number(s.subject_id));
+      const titleCount = subBooks.length;
+      const totalCopies = subBooks.reduce((acc, b) => acc + Number(b.quantity ?? b.total_copies ?? 0), 0);
+      const availCopies = subBooks.reduce((acc, b) => acc + Number(b.available ?? b.available_copies ?? 0), 0);
+      const icon = s.icon || "📚";
+      const code = s.subject_code || "GEN";
+
+      return `
+        <div class="card subject-catalog-card" style="position: relative; border-radius: var(--radius-md); padding: 20px; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; border: 1px solid var(--border-color); background: var(--bg-card);"
+             onclick="if(!event.target.closest('.subject-card-actions')) window.app.openSubjectDetail(${s.subject_id})"
+             onmouseenter="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 10px 24px rgba(0,0,0,0.25)';"
+             onmouseleave="this.style.transform='none'; this.style.boxShadow='none';">
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+              <div style="font-size: 34px; width: 54px; height: 54px; background: rgba(81,0,39,0.15); border: 1px solid var(--border-color); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                ${icon}
+              </div>
+              <div class="subject-card-actions" style="display: flex; gap: 6px;">
+                <button class="btn btn-secondary btn-sm btn-icon-only" title="Edit Subject" onclick="event.stopPropagation(); window.app.openEditSubjectModal(${s.subject_id})">✏️</button>
+                <button class="btn btn-danger btn-sm btn-icon-only" title="Delete Subject" onclick="event.stopPropagation(); window.app.promptDeleteSubject(${s.subject_id})">🗑️</button>
+              </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+              <span class="badge badge-accent" style="font-size: 11px; font-weight: 700;">${this.escapeHTML(code)}</span>
+            </div>
+
+            <h3 style="margin: 0 0 8px; font-size: 17px; font-weight: 800; color: var(--text-primary); line-height: 1.3;">
+              ${this.escapeHTML(s.subject_name)}
+            </h3>
+
+            <p style="margin: 0 0 16px; font-size: 12px; color: var(--text-secondary); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 34px;">
+              ${this.escapeHTML(s.description || "Comprehensive subject domain and textbook collection.")}
+            </p>
+          </div>
+
+          <div style="border-top: 1px solid var(--border-color); padding-top: 14px; margin-top: 8px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; font-size: 12px;">
+              <div style="background: rgba(0,0,0,0.15); padding: 8px 10px; border-radius: 6px;">
+                <div style="color: var(--text-muted); font-size: 11px;">Total Titles</div>
+                <div style="font-weight: 800; font-size: 15px; color: var(--text-primary);">${titleCount} books</div>
+              </div>
+              <div style="background: rgba(0,0,0,0.15); padding: 8px 10px; border-radius: 6px;">
+                <div style="color: var(--text-muted); font-size: 11px;">Available</div>
+                <div style="font-weight: 800; font-size: 15px; color: ${availCopies > 0 ? 'var(--success)' : 'var(--danger)'};">${availCopies} / ${totalCopies}</div>
+              </div>
+            </div>
+            <button class="btn btn-secondary btn-sm" style="width: 100%; justify-content: center; font-weight: 700; pointer-events: none;">
+              Explore Subject Catalog →
+            </button>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  // --- Subject Management Modals ---
+  openAddSubjectModal() {
+    document.getElementById("form-subject")?.reset();
+    document.getElementById("subject-modal-id").value = "";
+    document.getElementById("modal-subject-title").textContent = "Add New Subject";
+    document.getElementById("subject-modal-submit-btn").textContent = "Create Subject";
+    document.getElementById("modal-subject")?.classList.add("active");
+  }
+
+  openEditSubjectModal(subjectId) {
+    const s = window.db.getSubjectById ? window.db.getSubjectById(Number(subjectId)) : null;
+    if (!s) return;
+    document.getElementById("subject-modal-id").value = s.subject_id;
+    document.getElementById("subject-modal-name").value = s.subject_name || "";
+    document.getElementById("subject-modal-code").value = s.subject_code || "";
+    document.getElementById("subject-modal-icon").value = s.icon || "📚";
+    document.getElementById("subject-modal-desc").value = s.description || "";
+    document.getElementById("modal-subject-title").textContent = "Edit Subject";
+    document.getElementById("subject-modal-submit-btn").textContent = "Save Changes";
+    document.getElementById("modal-subject")?.classList.add("active");
+  }
+
+  openEditCurrentSubject() {
+    if (this.activeSubjectId) {
+      this.openEditSubjectModal(this.activeSubjectId);
+    }
+  }
+
+  openAddBookForCurrentSubject() {
+    this.openAddBookModal(this.activeSubjectId);
+  }
+
+  async handleSubjectFormSubmit(e) {
+    e.preventDefault();
+    const idVal = document.getElementById("subject-modal-id").value;
+    const name = document.getElementById("subject-modal-name").value.trim();
+    const code = document.getElementById("subject-modal-code").value.trim();
+    const icon = document.getElementById("subject-modal-icon").value.trim() || "📚";
+    const desc = document.getElementById("subject-modal-desc").value.trim();
+
+    if (!name) {
+      this.showToast("Required", "Please provide a subject name.", "danger");
+      return;
+    }
+
+    const payload = {
+      subject_name: name,
+      subject_code: code,
+      icon: icon,
+      description: desc
+    };
+
+    try {
+      if (idVal) {
+        await window.db.updateSubject(Number(idVal), payload);
+        this.showToast("Subject Updated", `Subject '${name}' updated successfully.`, "success");
+        if (this.activeSubjectId === Number(idVal)) {
+          this.openSubjectDetail(Number(idVal));
+        }
+      } else {
+        await window.db.addSubject(payload);
+        this.showToast("Subject Created", `Subject '${name}' added to library catalog.`, "success");
+      }
+      this.closeModal("modal-subject");
+      this.renderSubjectsCards();
+      this.renderBooks();
+    } catch (err) {
+      this.showToast("Error", err.message, "danger");
+    }
+  }
+
+  promptDeleteSubject(subjectId) {
+    const s = window.db.getSubjectById ? window.db.getSubjectById(Number(subjectId)) : null;
+    if (!s) return;
+    const books = window.db.getBooksBySubjectId ? window.db.getBooksBySubjectId(Number(subjectId)) : window.db.getBooks().filter(b => Number(b.subject_id) === Number(subjectId));
+
+    if (books.length === 0) {
+      if (confirm(`Are you sure you want to delete subject '${s.subject_name}'? No books belong to this subject.`)) {
+        this.executeDeleteSubject(s.subject_id, null);
+      }
+      return;
+    }
+
+    // Dependent books exist: show reassignment modal
+    this.pendingDeleteSubjectId = s.subject_id;
+    const modal = document.getElementById("modal-delete-subject");
+    const warnText = document.getElementById("delete-subject-warning-text");
+    const select = document.getElementById("delete-subject-reassign-select");
+    if (!modal || !select) return;
+
+    warnText.innerHTML = `Subject <strong>${this.escapeHTML(s.subject_name)}</strong> currently has <strong>${books.length} book(s)</strong> assigned to it.<br><br>Select a target subject to safely reassign all existing books before deleting:`;
+
+    const otherSubjects = (window.db.getSubjects ? window.db.getSubjects() : []).filter(sub => Number(sub.subject_id) !== Number(s.subject_id));
+    select.innerHTML = otherSubjects.map(sub => `
+      <option value="${sub.subject_id}">
+        ${this.escapeHTML(sub.subject_name)} (${this.escapeHTML(sub.subject_code || "GEN")})
+      </option>
+    `).join("");
+
+    modal.classList.add("active");
+  }
+
+  async confirmDeleteSubject() {
+    if (!this.pendingDeleteSubjectId) return;
+    const select = document.getElementById("delete-subject-reassign-select");
+    const reassignId = select ? Number(select.value) : null;
+    await this.executeDeleteSubject(this.pendingDeleteSubjectId, reassignId);
+    this.closeModal("modal-delete-subject");
+    this.pendingDeleteSubjectId = null;
+  }
+
+  async executeDeleteSubject(subjectId, reassignId) {
+    try {
+      await window.db.deleteSubject(subjectId, reassignId);
+      this.showToast("Subject Deleted", "Subject was safely removed.", "info");
+      if (this.activeSubjectId === Number(subjectId)) {
+        this.backToSubjects();
+      } else {
+        this.renderSubjectsCards();
+        this.renderBooks();
+      }
+    } catch (err) {
+      this.showToast("Deletion Blocked", err.message, "danger");
+    }
   }
 
   renderBranchFilter(books) {
@@ -521,8 +961,19 @@ class DGIApp {
       return;
     }
 
+    const subjects = window.db.getSubjects ? window.db.getSubjects() : [];
+    const subjectsMap = new Map(subjects.map(s => [Number(s.subject_id), s]));
+
     tbody.innerHTML = books.map(b => {
       const accessions = this.getBookAccessions(b);
+      const subject = subjectsMap.get(Number(b.subject_id));
+      const subjectName = subject ? subject.subject_name : (b.category || "General");
+      const subjectCode = subject?.subject_code ? `[${subject.subject_code}] ` : "";
+      const bookTitle = b.title || b.book_name || "Untitled Book";
+      const available = Number(b.available ?? b.available_copies ?? 0);
+      const total = Number(b.quantity ?? b.total_copies ?? 0);
+      const year = b.publication_year || b.published_year || "";
+
       return `
       <tr>
         <td>
@@ -531,29 +982,33 @@ class DGIApp {
               📖
             </div>
             <div>
-              <div class="book-meta-primary">${this.escapeHTML(b.title)}</div>
-              <div class="book-meta-sub">Pub: ${this.escapeHTML(b.published_year)} | ⭐ ${this.escapeHTML(b.rating)}</div>
+              <div class="book-meta-primary">${this.escapeHTML(bookTitle)}</div>
+              <div class="book-meta-sub">${year ? `Pub: ${this.escapeHTML(year)} | ` : ""}⭐ ${this.escapeHTML(b.rating || "4.5")}</div>
             </div>
           </div>
         </td>
+        <td>
+          <span class="badge badge-accent category-badge" title="${this.escapeHTML(subjectName)}" style="cursor:pointer;" onclick="window.app.openSubjectDetail(${b.subject_id || 1})">
+            ${this.escapeHTML(subjectCode)}${this.escapeHTML(subjectName)}
+          </span>
+        </td>
         <td>${this.escapeHTML(b.author)}${b.publisher ? `<div style="font-size: 11px; color: var(--text-muted);">Publication: ${this.escapeHTML(b.publisher)}</div>` : ""}</td>
         <td>${this.escapeHTML(this.getBookDepartments(b).join(", ") || "Unassigned")}</td>
-        <td><span class="badge badge-accent category-badge">${this.escapeHTML(b.category)}</span></td>
         <td>
-          <span class="isbn-code">${this.escapeHTML(b.isbn)}</span>
+          <span class="isbn-code">${this.escapeHTML(b.isbn || "—")}</span>
           ${accessions.length ? `<details style="font-size: 11px; margin-top: 5px;"><summary>${accessions.length} accession number${accessions.length === 1 ? "" : "s"}</summary><div style="max-height: 120px; overflow: auto;">${accessions.map(value => `<code>${this.escapeHTML(value)}</code>`).join("<br>")}</div></details>` : ""}
-          ${accessions.length && accessions.length !== Number(b.quantity) ? `<div class="badge badge-warning" style="margin-top: 5px;">Excel Qty ${this.escapeHTML(b.quantity)} / ${accessions.length} accession rows</div>` : ""}
+          ${accessions.length && accessions.length !== total ? `<div class="badge badge-warning" style="margin-top: 5px;">Excel Qty ${total} / ${accessions.length} accession rows</div>` : ""}
         </td>
-        <td><strong>${this.escapeHTML(b.available)}</strong> / ${this.escapeHTML(b.quantity)}</td>
+        <td><strong>${available}</strong> / ${total}</td>
         <td>
-          ${b.available > 0 
+          ${available > 0 
             ? `<span class="badge badge-success">Available</span>` 
             : `<span class="badge badge-danger">Out of Stock</span>`}
         </td>
         <td>
           <div class="action-btn-group">
             <button class="btn btn-secondary btn-sm btn-icon-only" title="Edit" onclick="window.app.openEditBookModal(${b.id})">✏️</button>
-            <button class="btn btn-primary btn-sm" ${b.available === 0 ? 'disabled style="opacity:0.5;"' : ''} onclick="window.app.quickIssueBook(${b.id})">Issue</button>
+            <button class="btn btn-primary btn-sm" ${available === 0 ? 'disabled style="opacity:0.5;"' : ''} onclick="window.app.quickIssueBook(${b.id})">Issue</button>
             <button class="btn btn-danger btn-sm btn-icon-only" title="Delete" onclick="window.app.deleteBook(${b.id})">🗑️</button>
           </div>
         </td>
@@ -2968,12 +3423,26 @@ class DGIApp {
   }
 
   // --- Modals & Printing ---
-  openAddBookModal() {
+  openAddBookModal(preselectSubjectId) {
     document.getElementById("form-book")?.reset();
     document.getElementById("book-modal-id").value = "";
     this.renderBookCategorySuggestions();
+    this.renderBookSubjectOptions(preselectSubjectId || this.activeSubjectId);
+    const yearInput = document.getElementById("book-modal-year");
+    if (yearInput) yearInput.value = new Date().getFullYear();
     document.getElementById("modal-book-title").textContent = "Add New Book";
     document.getElementById("modal-book").classList.add("active");
+  }
+
+  renderBookSubjectOptions(preselectedSubjectId) {
+    const select = document.getElementById("book-modal-subject");
+    if (!select) return;
+    const subjects = window.db.getSubjects ? window.db.getSubjects() : [];
+    select.innerHTML = subjects.map(s => `
+      <option value="${s.subject_id}" ${preselectedSubjectId && Number(preselectedSubjectId) === Number(s.subject_id) ? "selected" : ""}>
+        ${this.escapeHTML(s.subject_code ? `[${s.subject_code}] ` : "")}${this.escapeHTML(s.subject_name)}
+      </option>
+    `).join("");
   }
 
   renderBookCategorySuggestions() {
@@ -2996,14 +3465,17 @@ class DGIApp {
     if (!b) return;
 
     this.renderBookCategorySuggestions();
+    this.renderBookSubjectOptions(b.subject_id);
     document.getElementById("book-modal-id").value = b.id;
-    document.getElementById("book-modal-title-input").value = b.title;
-    document.getElementById("book-modal-author").value = b.author;
+    document.getElementById("book-modal-title-input").value = b.title || b.book_name || "";
+    document.getElementById("book-modal-author").value = b.author || "";
     document.getElementById("book-modal-publisher").value = b.publisher || "";
-    document.getElementById("book-modal-isbn").value = b.isbn;
-    document.getElementById("book-modal-category").value = b.category;
-    document.getElementById("book-modal-qty").value = b.quantity;
-    document.getElementById("book-modal-desc").value = b.description;
+    const yearInput = document.getElementById("book-modal-year");
+    if (yearInput) yearInput.value = b.publication_year || b.published_year || "";
+    document.getElementById("book-modal-isbn").value = b.isbn || "";
+    document.getElementById("book-modal-category").value = b.category || "";
+    document.getElementById("book-modal-qty").value = b.quantity || b.total_copies || 1;
+    document.getElementById("book-modal-desc").value = b.description || "";
     document.getElementById("modal-book-title").textContent = "Edit Book Details";
     document.getElementById("modal-book").classList.add("active");
   }
@@ -3011,13 +3483,22 @@ class DGIApp {
   submitBookForm(e) {
     e.preventDefault();
     const id = document.getElementById("book-modal-id").value;
+    const subjectSelect = document.getElementById("book-modal-subject");
+    const subjectId = subjectSelect ? (parseInt(subjectSelect.value, 10) || null) : null;
+    const yearVal = document.getElementById("book-modal-year")?.value || "";
+
     const bookData = {
       title: document.getElementById("book-modal-title-input").value,
+      book_name: document.getElementById("book-modal-title-input").value,
       author: document.getElementById("book-modal-author").value,
       publisher: document.getElementById("book-modal-publisher").value.trim(),
+      publication_year: yearVal,
+      published_year: yearVal,
       isbn: document.getElementById("book-modal-isbn").value,
       category: document.getElementById("book-modal-category").value,
+      subject_id: subjectId,
       quantity: document.getElementById("book-modal-qty").value,
+      total_copies: document.getElementById("book-modal-qty").value,
       description: document.getElementById("book-modal-desc").value
     };
 
@@ -3031,6 +3512,10 @@ class DGIApp {
       }
       this.closeModal("modal-book");
       this.renderBooks();
+      this.renderSubjectsCards();
+      if (this.activeSubjectId) {
+        this.renderSubjectBooksTable();
+      }
     } catch (err) {
       this.showToast("Error", err.message, "danger");
     }
@@ -3040,11 +3525,15 @@ class DGIApp {
     const b = window.db.getBookById(bookId);
     if (!b) return;
 
-    if (confirm(`Are you sure you want to delete '${b.title}'?`)) {
+    if (confirm(`Are you sure you want to delete '${b.title || b.book_name}'?`)) {
       try {
         window.db.deleteBook(bookId);
-        this.showToast("Book Deleted", `'${b.title}' was removed.`, "info");
+        this.showToast("Book Deleted", `'${b.title || b.book_name}' was removed.`, "info");
         this.renderBooks();
+        this.renderSubjectsCards();
+        if (this.activeSubjectId) {
+          this.renderSubjectBooksTable();
+        }
       } catch (err) {
         this.showToast("Deletion Blocked", err.message, "danger");
       }
@@ -4351,6 +4840,7 @@ class DGIApp {
   setupEventListeners() {
     // Books filter events
     document.getElementById("books-search-input")?.addEventListener("input", () => this.renderBooks());
+    document.getElementById("books-subject-filter-select")?.addEventListener("change", () => this.renderBooks());
     document.getElementById("books-category-select")?.addEventListener("change", () => this.renderBooks());
     document.getElementById("books-branch-select")?.addEventListener("change", () => this.renderBooks());
     document.getElementById("books-avail-select")?.addEventListener("change", () => this.renderBooks());

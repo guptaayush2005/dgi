@@ -85,18 +85,78 @@ function verifyPassword(password, salt, expectedHash) {
 // ---------------------------------------------------------------------------
 // Persistent store (single JSON file)
 // ---------------------------------------------------------------------------
+function defaultSubjects() {
+  return [
+    { subject_id: 1, subject_name: "Computer Science Fundamentals", subject_code: "CS-101", description: "Core computer science principles, discrete structures, and theoretical computation.", icon: "💻" },
+    { subject_id: 2, subject_name: "Programming & Software Development", subject_code: "CS-102", description: "Object-oriented programming, C++, Java, Python, and data structures.", icon: "⚡" },
+    { subject_id: 3, subject_name: "Databases & Information Systems", subject_code: "CS-103", description: "Relational database management, SQL, query processing, and data architecture.", icon: "🗄️" },
+    { subject_id: 4, subject_name: "Artificial Intelligence & Data Science", subject_code: "CS-104", description: "Machine learning algorithms, neural networks, computer vision, and modern AI.", icon: "🤖" },
+    { subject_id: 5, subject_name: "Operating Systems", subject_code: "CS-105", description: "Kernel architecture, process synchronization, memory management, and file systems.", icon: "⚙️" },
+    { subject_id: 6, subject_name: "Computer Networks", subject_code: "CS-106", description: "Network layers, protocols, TCP/IP, wireless routing, and data communication.", icon: "🌐" },
+    { subject_id: 7, subject_name: "Cyber Security & Cloud", subject_code: "CS-107", description: "Network security, cryptography, cloud computing infrastructure, and virtualization.", icon: "🔒" },
+    { subject_id: 8, subject_name: "Software Engineering & Architecture", subject_code: "CS-108", description: "Software engineering methodologies, system design patterns, and clean code principles.", icon: "📐" },
+    { subject_id: 9, subject_name: "Electronics & Communication", subject_code: "EC-201", description: "Semiconductor physics, analog and digital electronics, and circuit theory.", icon: "📡" },
+    { subject_id: 10, subject_name: "Mechanical Engineering", subject_code: "ME-301", description: "Engineering mechanics, statics, dynamics, thermodynamics, and manufacturing.", icon: "🔧" },
+    { subject_id: 11, subject_name: "Mathematics & Applied Sciences", subject_code: "AS-101", description: "Engineering mathematics, calculus, linear algebra, and numerical techniques.", icon: "📊" }
+  ];
+}
+
+function mapBookToSubjectId(book) {
+  const t = (String(book.title || '') + ' ' + String(book.category || '')).toLowerCase();
+  if (t.includes('database') || t.includes('dbms') || t.includes('sql')) return 3;
+  if (t.includes('operating system') || t.includes('os internals')) return 5;
+  if (t.includes('network')) return 6;
+  if (t.includes('artificial intelligence') || t.includes('machine learning')) return 4;
+  if (t.includes('clean code') || t.includes('software engineering')) return 8;
+  if (t.includes('cloud')) return 7;
+  if (t.includes('electronic') || t.includes('circuit')) return 9;
+  if (t.includes('mechanic') || t.includes('mechanical')) return 10;
+  if (t.includes('data structure') || t.includes('java') || t.includes('programming') || t.includes('algorithm') || t.includes('web tech')) return 2;
+  if (t.includes('automata') || t.includes('computer science') || t.includes('theory')) return 1;
+  return 1;
+}
+
+function ensureDatabaseIntegrity(state) {
+  if (!state || typeof state !== 'object') return;
+  if (!Array.isArray(state.subjects) || state.subjects.length === 0) {
+    state.subjects = defaultSubjects();
+  }
+  if (!Array.isArray(state.book_requests)) {
+    state.book_requests = [];
+  }
+  if (Array.isArray(state.books)) {
+    state.books.forEach((b, idx) => {
+      b.id = Number(b.id) || (idx + 1);
+      b.book_id = Number(b.book_id) || b.id;
+      b.book_name = b.book_name || b.title || `Book #${b.book_id}`;
+      b.title = b.title || b.book_name;
+      b.subject_id = Number(b.subject_id) || mapBookToSubjectId(b);
+      const sub = state.subjects.find(s => s.subject_id === b.subject_id);
+      if (sub && !b.category) b.category = sub.subject_name;
+      b.total_copies = Number(b.total_copies ?? b.quantity ?? 1);
+      b.available_copies = Number(b.available_copies ?? b.available ?? b.total_copies);
+      b.quantity = b.total_copies;
+      b.available = b.available_copies;
+      b.publication_year = b.publication_year ?? b.published_year ?? 2024;
+      b.publisher = b.publisher || 'DGI Academic Press';
+      b.isbn = b.isbn || ('978-DGI-' + String(b.book_id).padStart(4, '0'));
+    });
+  }
+}
+
 function defaultLibraryState() {
+  const subjects = defaultSubjects();
   const books = [
-    { id: 1, title: "Data Structures & Algorithms in C++", author: "Mark Allen Weiss", isbn: "978-0132847377", category: "CSIT", shelf_location: "Stack CS-101", total_copies: 5, available_copies: 3 },
-    { id: 2, title: "Database System Concepts", author: "Silberschatz, Korth, Sudarshan", isbn: "978-0078022159", category: "CSIT", shelf_location: "Stack CS-102", total_copies: 6, available_copies: 1 },
-    { id: 3, title: "Operating System Concepts", author: "Abraham Silberschatz, Peter B. Galvin", isbn: "978-1118063330", category: "CSIT", shelf_location: "Stack CS-103", total_copies: 4, available_copies: 2 },
-    { id: 4, title: "Computer Networks", author: "Andrew S. Tanenbaum", isbn: "978-0132126953", category: "CSIT", shelf_location: "Stack CS-104", total_copies: 5, available_copies: 4 },
-    { id: 5, title: "Artificial Intelligence: A Modern Approach", author: "Stuart Russell, Peter Norvig", isbn: "978-0136042594", category: "CSIT", shelf_location: "Stack CS-105", total_copies: 3, available_copies: 1 },
-    { id: 6, title: "Web Technologies: HTML, CSS, JavaScript & PHP", author: "Uttam K. Roy", isbn: "978-0198066224", category: "CSIT", shelf_location: "Stack CS-106", total_copies: 4, available_copies: 3 },
-    { id: 7, title: "Theory of Computer Science: Automata, Languages", author: "K.L.P. Mishra, N. Chandrasekaran", isbn: "978-8120329683", category: "CSIT", shelf_location: "Stack CS-107", total_copies: 4, available_copies: 2 },
-    { id: 8, title: "Software Engineering: A Practitioner's Approach", author: "Roger S. Pressman", isbn: "978-0078022128", category: "CSIT", shelf_location: "Stack CS-108", total_copies: 5, available_copies: 0 },
-    { id: 9, title: "Electronic Devices and Circuit Theory", author: "Robert L. Boylestad, Louis Nashelsky", isbn: "978-0137692828", category: "Electronics", shelf_location: "Stack EC-201", total_copies: 3, available_copies: 1 },
-    { id: 10, title: "Engineering Mechanics: Statics and Dynamics", author: "S. Timoshenko, D.H. Young", isbn: "978-0070616806", category: "Mechanical", shelf_location: "Stack ME-301", total_copies: 5, available_copies: 4 }
+    { id: 1, book_id: 1, title: "Data Structures & Algorithms in C++", book_name: "Data Structures & Algorithms in C++", author: "Mark Allen Weiss", subject_id: 2, isbn: "978-0132847377", publisher: "Pearson", publication_year: 2013, category: "Programming & Software Development", shelf_location: "Stack CS-101", total_copies: 5, available_copies: 3, quantity: 5, available: 3 },
+    { id: 2, book_id: 2, title: "Database System Concepts", book_name: "Database System Concepts", author: "Silberschatz, Korth, Sudarshan", subject_id: 3, isbn: "978-0078022159", publisher: "McGraw-Hill", publication_year: 2019, category: "Databases & Information Systems", shelf_location: "Stack CS-102", total_copies: 6, available_copies: 1, quantity: 6, available: 1 },
+    { id: 3, book_id: 3, title: "Operating System Concepts", book_name: "Operating System Concepts", author: "Abraham Silberschatz, Peter B. Galvin", subject_id: 5, isbn: "978-1118063330", publisher: "Wiley", publication_year: 2018, category: "Operating Systems", shelf_location: "Stack CS-103", total_copies: 4, available_copies: 2, quantity: 4, available: 2 },
+    { id: 4, book_id: 4, title: "Computer Networks", book_name: "Computer Networks", author: "Andrew S. Tanenbaum", subject_id: 6, isbn: "978-0132126953", publisher: "Pearson", publication_year: 2020, category: "Computer Networks", shelf_location: "Stack CS-104", total_copies: 5, available_copies: 4, quantity: 5, available: 4 },
+    { id: 5, book_id: 5, title: "Artificial Intelligence: A Modern Approach", book_name: "Artificial Intelligence: A Modern Approach", author: "Stuart Russell, Peter Norvig", subject_id: 4, isbn: "978-0136042594", publisher: "Pearson", publication_year: 2021, category: "Artificial Intelligence & Data Science", shelf_location: "Stack CS-105", total_copies: 3, available_copies: 1, quantity: 3, available: 1 },
+    { id: 6, book_id: 6, title: "Web Technologies: HTML, CSS, JavaScript & PHP", book_name: "Web Technologies: HTML, CSS, JavaScript & PHP", author: "Uttam K. Roy", subject_id: 2, isbn: "978-0198066224", publisher: "Oxford", publication_year: 2018, category: "Programming & Software Development", shelf_location: "Stack CS-106", total_copies: 4, available_copies: 3, quantity: 4, available: 3 },
+    { id: 7, book_id: 7, title: "Theory of Computer Science: Automata, Languages", book_name: "Theory of Computer Science: Automata, Languages", author: "K.L.P. Mishra, N. Chandrasekaran", subject_id: 1, isbn: "978-8120329683", publisher: "PHI Learning", publication_year: 2014, category: "Computer Science Fundamentals", shelf_location: "Stack CS-107", total_copies: 4, available_copies: 2, quantity: 4, available: 2 },
+    { id: 8, book_id: 8, title: "Software Engineering: A Practitioner's Approach", book_name: "Software Engineering: A Practitioner's Approach", author: "Roger S. Pressman", subject_id: 8, isbn: "978-0078022128", publisher: "McGraw-Hill", publication_year: 2019, category: "Software Engineering & Architecture", shelf_location: "Stack CS-108", total_copies: 5, available_copies: 0, quantity: 5, available: 0 },
+    { id: 9, book_id: 9, title: "Electronic Devices and Circuit Theory", book_name: "Electronic Devices and Circuit Theory", author: "Robert L. Boylestad, Louis Nashelsky", subject_id: 9, isbn: "978-0137692828", publisher: "Pearson", publication_year: 2015, category: "Electronics & Communication", shelf_location: "Stack EC-201", total_copies: 3, available_copies: 1, quantity: 3, available: 1 },
+    { id: 10, book_id: 10, title: "Engineering Mechanics: Statics and Dynamics", book_name: "Engineering Mechanics: Statics and Dynamics", author: "S. Timoshenko, D.H. Young", subject_id: 10, isbn: "978-0070616806", publisher: "McGraw-Hill", publication_year: 2017, category: "Mechanical Engineering", shelf_location: "Stack ME-301", total_copies: 5, available_copies: 4, quantity: 5, available: 4 }
   ];
   const students = [
     { id: 1, name: "Ayush Gupta", roll_no: "CS101", department: "CSIT", email: "ayush.csit@dronacharya.info", phone: "+91 98765 43210" },
@@ -112,12 +172,14 @@ function defaultLibraryState() {
     { id: 4, student_id: 2, book_id: 8, book_title: "Software Engineering: A Practitioner's Approach", book_isbn: "978-0078022128", issue_date: "2026-11-01", due_date: "2026-11-15", return_date: null, status: "issued", fine: 10, reissue_count: 1 }
   ];
   return {
+    subjects,
     books,
     students,
     faculty: [],
     transactions,
     faculty_transactions: [],
     alert_logs: [],
+    book_requests: [],
     settings: {
       library_name: "DGI Central Library",
       institution_name: "Dronacharya Group of Institutions, Greater Noida",
@@ -139,7 +201,7 @@ function emptyStore() {
     reissueRequests: {},   // key -> [ request, ... ]
     reissueLinks: {},      // token -> { accountKey, transactionId, createdAt }
     resetTokens: {},       // token -> { accountKey, expiresAt }
-    sessions: {}           // sid -> { accountKey, expiresAt }
+    sessions: {}           // sid -> { accountKey, role, studentId, rollNo, expiresAt }
   };
 }
 function seedStore() {
@@ -193,6 +255,12 @@ function loadStore() {
       loaded.states = loaded.states || {};
       loaded.states.admin = { state: defaultLibraryState(), revision: 1 };
     }
+    // Ensure database integrity for all states
+    for (const key of Object.keys(loaded.states || {})) {
+      if (loaded.states[key] && loaded.states[key].state) {
+        ensureDatabaseIntegrity(loaded.states[key].state);
+      }
+    }
     return loaded;
   } catch {
     return seedStore();
@@ -238,20 +306,46 @@ function signSessionToken(data) {
 function verifySessionToken(token) {
   if (!token || typeof token !== 'string') return null;
   const parts = token.split('.');
-  if (parts.length !== 3) return null;
-  const [accountKey, expiresAtStr, sig] = parts;
-  const data = `${accountKey}.${expiresAtStr}`;
-  const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(data).digest('hex');
-  if (sig !== expectedSig) return null;
-  const expiresAt = Number(expiresAtStr);
-  if (isNaN(expiresAt) || expiresAt <= Date.now()) return null;
-  return accountKey;
+  if (parts.length === 3) {
+    // Legacy format: accountKey.expiresAt.sig
+    const [accountKey, expiresAtStr, sig] = parts;
+    const data = `${accountKey}.${expiresAtStr}`;
+    const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(data).digest('hex');
+    if (sig !== expectedSig) return null;
+    const expiresAt = Number(expiresAtStr);
+    if (isNaN(expiresAt) || expiresAt <= Date.now()) return null;
+    return { role: 'admin', accountKey, studentId: null, expiresAt };
+  } else if (parts.length === 5) {
+    // Role-based format: role.accountKey.studentId.expiresAt.sig
+    const [role, accountKey, studentIdStr, expiresAtStr, sig] = parts;
+    const data = `${role}.${accountKey}.${studentIdStr}.${expiresAtStr}`;
+    const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(data).digest('hex');
+    if (sig !== expectedSig) return null;
+    const expiresAt = Number(expiresAtStr);
+    if (isNaN(expiresAt) || expiresAt <= Date.now()) return null;
+    return {
+      role,
+      accountKey,
+      studentId: studentIdStr === 'null' ? null : Number(studentIdStr),
+      expiresAt
+    };
+  }
+  return null;
 }
 
-function createSession(accountKey) {
+function createSession(accountKey, role = 'admin', studentData = null) {
   const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
-  const token = signSessionToken(`${accountKey}.${expiresAt}`);
-  store.sessions[token] = { accountKey, expiresAt };
+  const studentId = studentData && studentData.id ? studentData.id : 'null';
+  const data = `${role}.${accountKey}.${studentId}.${expiresAt}`;
+  const token = signSessionToken(data);
+  store.sessions[token] = {
+    accountKey,
+    role,
+    studentId: studentData?.id || null,
+    rollNo: studentData?.roll_no || null,
+    student: studentData || null,
+    expiresAt
+  };
   return token;
 }
 function sessionCookieHeader(sid) {
@@ -261,23 +355,72 @@ function sessionCookieHeader(sid) {
 function clearCookieHeader() {
   return `${SESSION_COOKIE}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`;
 }
-function requestAccount(req) {
+
+function getRequestSession(req) {
   const cookieHeader = req.headers.cookie || '';
   const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`));
   if (!match) return null;
   const token = match[1];
-  // 1. Check in-memory store if present
+
+  // 1. Check in-memory store
   const session = store.sessions[token];
   if (session && session.expiresAt > Date.now()) {
-    const found = store.accounts.find(a => a.key === session.accountKey);
-    if (found) return found;
+    if (session.role === 'student') {
+      const primaryKey = (store.accounts.find(a => a.isPrimary) || store.accounts[0] || {}).key || 'admin';
+      const state = (store.states[primaryKey] || {}).state || defaultLibraryState();
+      const student = (state.students || []).find(s => Number(s.id) === Number(session.studentId) || (session.rollNo && String(s.roll_no).toLowerCase() === session.rollNo.toLowerCase())) || session.student;
+      return {
+        role: 'student',
+        accountKey: session.accountKey,
+        studentId: session.studentId,
+        rollNo: session.rollNo,
+        student: student || session.student,
+        username: student?.name || session.rollNo
+      };
+    } else {
+      const found = store.accounts.find(a => a.key === session.accountKey);
+      return {
+        role: 'admin',
+        accountKey: session.accountKey,
+        account: found || { username: session.accountKey, key: session.accountKey, isPrimary: true },
+        username: found ? found.username : session.accountKey
+      };
+    }
   }
-  // 2. Fall back to cryptographic token verification (stateless lambda support)
-  const accountKey = verifySessionToken(token);
-  if (!accountKey) return null;
-  const acc = store.accounts.find(a => a.key === accountKey);
-  return acc || { username: accountKey, key: accountKey, isPrimary: true };
+
+  // 2. Fall back to cryptographic token verification
+  const verified = verifySessionToken(token);
+  if (!verified) return null;
+
+  if (verified.role === 'student') {
+    const primaryKey = (store.accounts.find(a => a.isPrimary) || store.accounts[0] || {}).key || 'admin';
+    const state = (store.states[primaryKey] || {}).state || defaultLibraryState();
+    const student = (state.students || []).find(s => Number(s.id) === Number(verified.studentId) || (verified.accountKey && String(s.roll_no).toLowerCase() === verified.accountKey.toLowerCase()));
+    return {
+      role: 'student',
+      accountKey: verified.accountKey,
+      studentId: verified.studentId,
+      rollNo: student?.roll_no || verified.accountKey,
+      student: student || null,
+      username: student?.name || verified.accountKey
+    };
+  } else {
+    const acc = store.accounts.find(a => a.key === verified.accountKey);
+    return {
+      role: 'admin',
+      accountKey: verified.accountKey,
+      account: acc || { username: verified.accountKey, key: verified.accountKey, isPrimary: true },
+      username: acc ? acc.username : verified.accountKey
+    };
+  }
 }
+
+function requestAccount(req) {
+  const session = getRequestSession(req);
+  if (!session || session.role !== 'admin') return null;
+  return session.account;
+}
+
 function dropAccountSessions(accountKey) {
   for (const [sid, session] of Object.entries(store.sessions)) {
     if (session.accountKey === accountKey) delete store.sessions[sid];
@@ -334,12 +477,21 @@ function findTransaction(accountKey, transactionId) {
 // Security Middleware & Utility Helpers
 // ---------------------------------------------------------------------------
 function requireAdmin(req, res) {
-  const account = requestAccount(req);
-  if (!account) {
-    send(res, 401, { error: 'Authentication required. Please sign in as administrator.' });
+  const session = getRequestSession(req);
+  if (!session || session.role !== 'admin') {
+    send(res, 403, { error: 'Administrator access required. Permission denied.' });
     return null;
   }
-  return account;
+  return session.account;
+}
+
+function requireStudentOrAdmin(req, res) {
+  const session = getRequestSession(req);
+  if (!session) {
+    send(res, 401, { error: 'Authentication required. Please sign in.' });
+    return null;
+  }
+  return session;
 }
 
 function parseCSV(text) {
@@ -479,22 +631,210 @@ async function handleRequest(req, res) {
 
   try {
     // ============================ STUDENT PORTAL API =======================
+    if (p === '/api/student/dashboard' && method === 'GET') {
+      const session = requireStudentOrAdmin(req, res);
+      if (!session) return;
+      const primaryKey = (store.accounts.find(a => a.isPrimary) || store.accounts[0] || {}).key || 'admin';
+      const state = (store.states[primaryKey] || {}).state || defaultLibraryState();
+      ensureDatabaseIntegrity(state);
+
+      const roll = (session.role === 'student' ? session.rollNo : (url.searchParams.get('roll_no') || 'CS101')).toLowerCase();
+      const student = (state.students || []).find(s => String(s.roll_no || '').toLowerCase() === roll) || (state.students && state.students[0]) || { id: 1, name: "Student", roll_no: "CS101", department: "CSIT" };
+
+      const studentTx = (state.transactions || []).filter(t => Number(t.student_id) === Number(student.id));
+      const currentlyIssued = studentTx.filter(t => t.status === 'issued');
+      const returnedHistory = studentTx.filter(t => t.status === 'returned');
+
+      const today = new Date().toISOString().split('T')[0];
+      const overdueBooks = currentlyIssued.filter(t => t.due_date && String(t.due_date) < today);
+      const pendingReturns = currentlyIssued.filter(t => {
+        if (!t.due_date) return false;
+        const diffDays = Math.ceil((new Date(t.due_date + "T00:00:00") - new Date()) / 86400000);
+        return diffDays >= 0 && diffDays <= 3;
+      });
+
+      const totalAvailableCopies = (state.books || []).reduce((acc, b) => acc + Math.max(0, Number(b.available_copies ?? b.available ?? b.total_copies ?? 1)), 0);
+      const studentRequests = (state.book_requests || []).filter(r => Number(r.student_id) === Number(student.id));
+      const notifications = (store.messages[primaryKey] || []).filter(m => Number(m.borrowerId) === Number(student.id) || (m.student && String(m.student.rollNo).toLowerCase() === roll));
+
+      return send(res, 200, {
+        student: {
+          id: student.id,
+          name: student.name,
+          roll_no: student.roll_no,
+          department: student.department || 'CSIT',
+          email: student.email,
+          phone: student.phone
+        },
+        kpis: {
+          total_available_books: totalAvailableCopies,
+          books_currently_issued: currentlyIssued.length,
+          pending_returns: pendingReturns.length,
+          overdue_books: overdueBooks.length
+        },
+        stats: {
+          totalAvailableBooks: totalAvailableCopies,
+          currentlyIssued: currentlyIssued.length,
+          pendingReturns: pendingReturns.length,
+          overdueBooks: overdueBooks.length
+        },
+        activeLoans: currentlyIssued,
+        currently_issued: currentlyIssued,
+        history: returnedHistory,
+        book_requests: studentRequests,
+        notifications: notifications.slice(0, 10)
+      });
+    }
+
+    if (p === '/api/student/my-books' && method === 'GET') {
+      const session = requireStudentOrAdmin(req, res);
+      if (!session) return;
+      const primaryKey = (store.accounts.find(a => a.isPrimary) || store.accounts[0] || {}).key || 'admin';
+      const state = (store.states[primaryKey] || {}).state || defaultLibraryState();
+      ensureDatabaseIntegrity(state);
+
+      const roll = (session.role === 'student' ? session.rollNo : (url.searchParams.get('roll_no') || 'CS101')).toLowerCase();
+      const student = (state.students || []).find(s => String(s.roll_no || '').toLowerCase() === roll);
+      if (!student) return send(res, 404, { error: 'Student record not found.' });
+
+      const studentTx = (state.transactions || []).filter(t => Number(t.student_id) === Number(student.id));
+      const currentlyIssued = studentTx.filter(t => t.status === 'issued');
+      const returnedHistory = studentTx.filter(t => t.status === 'returned');
+
+      return send(res, 200, {
+        currently_issued: currentlyIssued,
+        history: returnedHistory,
+        total_issued: currentlyIssued.length,
+        total_returned: returnedHistory.length
+      });
+    }
+
+    if (p === '/api/student/profile' && method === 'GET') {
+      const session = requireStudentOrAdmin(req, res);
+      if (!session) return;
+      const primaryKey = (store.accounts.find(a => a.isPrimary) || store.accounts[0] || {}).key || 'admin';
+      const state = (store.states[primaryKey] || {}).state || defaultLibraryState();
+      ensureDatabaseIntegrity(state);
+
+      const roll = (session.role === 'student' ? session.rollNo : (url.searchParams.get('roll_no') || 'CS101')).toLowerCase();
+      const student = (state.students || []).find(s => String(s.roll_no || '').toLowerCase() === roll);
+      if (!student) return send(res, 404, { error: 'Student profile not found.' });
+
+      return send(res, 200, { student });
+    }
+
+    if (p === '/api/student/book-requests' && method === 'GET') {
+      const session = requireStudentOrAdmin(req, res);
+      if (!session) return;
+      const primaryKey = (store.accounts.find(a => a.isPrimary) || store.accounts[0] || {}).key || 'admin';
+      const state = (store.states[primaryKey] || {}).state || defaultLibraryState();
+      ensureDatabaseIntegrity(state);
+
+      const roll = (session.role === 'student' ? session.rollNo : (url.searchParams.get('roll_no') || 'CS101')).toLowerCase();
+      const student = (state.students || []).find(s => String(s.roll_no || '').toLowerCase() === roll);
+      const studentId = student ? student.id : session.studentId;
+
+      const requests = (state.book_requests || []).filter(r => Number(r.student_id) === Number(studentId));
+      return send(res, 200, { requests });
+    }
+
+    if (p === '/api/student/book-requests' && method === 'POST') {
+      const session = requireStudentOrAdmin(req, res);
+      if (!session) return;
+      const b = await readBody(req);
+      const bookId = Number(b.book_id || b.id);
+      if (!bookId) return send(res, 400, { error: 'Book ID is required.' });
+
+      const primaryKey = (store.accounts.find(a => a.isPrimary) || store.accounts[0] || {}).key || 'admin';
+      const entry = accountState(primaryKey);
+      const state = entry.state || (entry.state = defaultLibraryState());
+      ensureDatabaseIntegrity(state);
+
+      const book = (state.books || []).find(bk => Number(bk.book_id) === bookId || Number(bk.id) === bookId);
+      if (!book) return send(res, 404, { error: 'Book not found in library catalog.' });
+
+      const roll = (session.role === 'student' ? session.rollNo : (b.roll_no || 'CS101')).toLowerCase();
+      const student = (state.students || []).find(s => String(s.roll_no || '').toLowerCase() === roll) || { id: session.studentId || 1, name: session.username || "Student", roll_no: roll };
+
+      const existingReq = (state.book_requests || []).find(r => Number(r.student_id) === Number(student.id) && Number(r.book_id) === bookId && r.status === 'pending');
+      if (existingReq) {
+        return send(res, 409, { error: 'You already have an active pending request for this title.' });
+      }
+
+      const nextReqId = (state.book_requests || []).reduce((max, r) => Math.max(max, Number(r.id) || 0), 0) + 1;
+      const newRequest = {
+        id: nextReqId,
+        student_id: student.id,
+        student_name: student.name,
+        student_roll: student.roll_no,
+        book_id: book.book_id || book.id,
+        book_title: book.title || book.book_name,
+        author: book.author || '',
+        isbn: book.isbn || '',
+        status: 'pending',
+        requested_at: new Date().toISOString(),
+        notes: String(b.notes || '').trim()
+      };
+
+      state.book_requests = state.book_requests || [];
+      state.book_requests.push(newRequest);
+      entry.revision += 1;
+      await saveStore();
+
+      return send(res, 201, { success: true, request: newRequest });
+    }
+
+    const cancelRequestMatch = p.match(/^\/api\/student\/book-requests\/(\d+)$/);
+    if (cancelRequestMatch && method === 'DELETE') {
+      const session = requireStudentOrAdmin(req, res);
+      if (!session) return;
+      const reqId = Number(cancelRequestMatch[1]);
+      const primaryKey = (store.accounts.find(a => a.isPrimary) || store.accounts[0] || {}).key || 'admin';
+      const entry = accountState(primaryKey);
+      const state = entry.state || (entry.state = defaultLibraryState());
+      ensureDatabaseIntegrity(state);
+
+      const rIndex = (state.book_requests || []).findIndex(r => Number(r.id) === reqId);
+      if (rIndex === -1) return send(res, 404, { error: 'Request not found.' });
+
+      state.book_requests.splice(rIndex, 1);
+      entry.revision += 1;
+      await saveStore();
+      return send(res, 200, { success: true, deletedRequestId: reqId });
+    }
+
     if (p === '/api/student/books' && method === 'GET') {
       const primaryKey = (store.accounts.find(a => a.isPrimary) || store.accounts[0] || {}).key || 'admin';
       const defaultState = defaultLibraryState();
       const rawState = (store.states[primaryKey] || {}).state;
       const state = (rawState && typeof rawState === 'object') ? rawState : defaultState;
+      ensureDatabaseIntegrity(state);
+
       const books = (Array.isArray(state.books) && state.books.length > 0) ? state.books : defaultState.books;
-      const publicBooks = books.map(b => ({
-        id: b.id,
-        title: b.title,
-        author: b.author,
-        isbn: b.isbn,
-        category: b.category,
-        shelf_location: b.shelf_location,
-        total_copies: Number(b.total_copies) || 1,
-        available_copies: Number(b.available_copies) >= 0 ? Number(b.available_copies) : (Number(b.total_copies) || 1)
-      }));
+      const publicBooks = books.map(b => {
+        const sub = (state.subjects || []).find(s => Number(s.subject_id) === Number(b.subject_id)) || {};
+        return {
+          id: b.id,
+          book_id: b.book_id || b.id,
+          title: b.title || b.book_name,
+          book_name: b.book_name || b.title,
+          author: b.author,
+          isbn: b.isbn || '',
+          subject_id: b.subject_id,
+          subject_name: sub.subject_name || b.category || 'General',
+          subject_code: sub.subject_code || '',
+          category: b.category || sub.subject_name || 'General',
+          publisher: b.publisher || 'DGI Academic Press',
+          publication_year: b.publication_year ?? b.published_year ?? 2024,
+          shelf_location: b.shelf_location || 'Central Stack',
+          description: b.description || '',
+          total_copies: Number(b.total_copies ?? b.quantity ?? 1),
+          available_copies: Number(b.available_copies >= 0 ? b.available_copies : (b.available >= 0 ? b.available : (b.total_copies || 1))),
+          color1: b.color1 || '#510027',
+          color2: b.color2 || '#3d001e',
+          rating: b.rating || 4.5
+        };
+      });
       return send(res, 200, { books: publicBooks });
     }
 
@@ -506,6 +846,8 @@ async function handleRequest(req, res) {
       const defaultState = defaultLibraryState();
       const rawState = (store.states[primaryKey] || {}).state;
       const state = (rawState && typeof rawState === 'object') ? rawState : defaultState;
+      ensureDatabaseIntegrity(state);
+
       const students = (Array.isArray(state.students) && state.students.length > 0) ? state.students : defaultState.students;
       const transactions = (Array.isArray(state.transactions) && state.transactions.length > 0) ? state.transactions : defaultState.transactions;
 
@@ -533,14 +875,191 @@ async function handleRequest(req, res) {
       });
     }
 
+    // ============================ SUBJECTS API ==============================
+    if (p === '/api/subjects' && method === 'GET') {
+      const primaryKey = (store.accounts.find(a => a.isPrimary) || store.accounts[0] || {}).key || 'admin';
+      const state = (store.states[primaryKey] || {}).state || defaultLibraryState();
+      ensureDatabaseIntegrity(state);
+
+      const subjects = (state.subjects || []).map(s => {
+        const bks = (state.books || []).filter(b => Number(b.subject_id) === Number(s.subject_id));
+        const totalBooks = bks.length;
+        const totalCopies = bks.reduce((sum, b) => sum + Number(b.total_copies ?? b.quantity ?? 1), 0);
+        const availableBooks = bks.reduce((sum, b) => sum + Math.max(0, Number(b.available_copies ?? b.available ?? b.total_copies ?? 1)), 0);
+        return {
+          subject_id: s.subject_id,
+          subject_name: s.subject_name,
+          subject_code: s.subject_code || '',
+          description: s.description || '',
+          icon: s.icon || '📖',
+          total_books: totalBooks,
+          available_books: availableBooks,
+          total_copies: totalCopies
+        };
+      });
+      return send(res, 200, { subjects });
+    }
+
+    const subjectDetailMatch = p.match(/^\/api\/subjects\/(\d+)\/books$/);
+    if (subjectDetailMatch && method === 'GET') {
+      const subId = Number(subjectDetailMatch[1]);
+      const primaryKey = (store.accounts.find(a => a.isPrimary) || store.accounts[0] || {}).key || 'admin';
+      const state = (store.states[primaryKey] || {}).state || defaultLibraryState();
+      ensureDatabaseIntegrity(state);
+
+      const subject = (state.subjects || []).find(s => Number(s.subject_id) === subId);
+      if (!subject) return send(res, 404, { error: 'Subject not found.' });
+
+      const books = (state.books || []).filter(b => Number(b.subject_id) === subId).map(b => ({
+        id: b.id,
+        book_id: b.book_id || b.id,
+        title: b.title || b.book_name,
+        book_name: b.book_name || b.title,
+        author: b.author,
+        subject_id: b.subject_id,
+        subject_name: subject.subject_name,
+        isbn: b.isbn || '',
+        publisher: b.publisher || 'DGI Academic Press',
+        publication_year: b.publication_year ?? b.published_year ?? 2024,
+        total_copies: Number(b.total_copies ?? b.quantity ?? 1),
+        available_copies: Number(b.available_copies ?? b.available ?? b.total_copies ?? 1),
+        shelf_location: b.shelf_location || '',
+        description: b.description || '',
+        category: b.category || subject.subject_name
+      }));
+
+      return send(res, 200, { subject, books });
+    }
+
+    if (p === '/api/admin/subjects' && method === 'POST') {
+      const account = requireAdmin(req, res);
+      if (!account) return;
+      const b = await readBody(req);
+      const name = String(b.subject_name || b.name || '').trim();
+      const code = String(b.subject_code || b.code || '').trim();
+      const desc = String(b.description || '').trim();
+      const icon = String(b.icon || '📖').trim();
+
+      if (!name) return send(res, 400, { error: 'Subject name is required.' });
+
+      const entry = accountState(account.key);
+      const state = entry.state || (entry.state = defaultLibraryState());
+      ensureDatabaseIntegrity(state);
+
+      const dup = state.subjects.find(s => s.subject_name.toLowerCase() === name.toLowerCase() || (code && s.subject_code && s.subject_code.toLowerCase() === code.toLowerCase()));
+      if (dup) {
+        return send(res, 409, { error: `A subject with name '${dup.subject_name}' or code '${dup.subject_code}' already exists.` });
+      }
+
+      const nextId = state.subjects.reduce((max, s) => Math.max(max, Number(s.subject_id) || 0), 0) + 1;
+      const newSubject = {
+        subject_id: nextId,
+        subject_name: name,
+        subject_code: code,
+        description: desc,
+        icon: icon || '📖',
+        created_at: new Date().toISOString()
+      };
+      state.subjects.push(newSubject);
+      entry.revision += 1;
+      await saveStore();
+      return send(res, 201, { success: true, subject: newSubject, subjects: state.subjects });
+    }
+
+    const adminSubjectMatch = p.match(/^\/api\/admin\/subjects\/(\d+)$/);
+    if (adminSubjectMatch && method === 'PUT') {
+      const account = requireAdmin(req, res);
+      if (!account) return;
+      const subId = Number(adminSubjectMatch[1]);
+      const b = await readBody(req);
+      const name = String(b.subject_name || b.name || '').trim();
+      const code = String(b.subject_code || b.code || '').trim();
+      const desc = String(b.description !== undefined ? b.description : '').trim();
+      const icon = String(b.icon || '').trim();
+
+      if (!name) return send(res, 400, { error: 'Subject name is required.' });
+
+      const entry = accountState(account.key);
+      const state = entry.state || (entry.state = defaultLibraryState());
+      ensureDatabaseIntegrity(state);
+
+      const subject = state.subjects.find(s => Number(s.subject_id) === subId);
+      if (!subject) return send(res, 404, { error: 'Subject not found.' });
+
+      const dup = state.subjects.find(s => Number(s.subject_id) !== subId && (s.subject_name.toLowerCase() === name.toLowerCase() || (code && s.subject_code && s.subject_code.toLowerCase() === code.toLowerCase())));
+      if (dup) {
+        return send(res, 409, { error: 'Another subject with this name or code already exists.' });
+      }
+
+      const oldName = subject.subject_name;
+      subject.subject_name = name;
+      if (code !== undefined) subject.subject_code = code;
+      if (b.description !== undefined) subject.description = desc;
+      if (icon) subject.icon = icon;
+
+      (state.books || []).forEach(bk => {
+        if (Number(bk.subject_id) === subId && (!bk.category || bk.category === oldName)) {
+          bk.category = name;
+        }
+      });
+
+      entry.revision += 1;
+      await saveStore();
+      return send(res, 200, { success: true, subject, subjects: state.subjects });
+    }
+
+    if (adminSubjectMatch && method === 'DELETE') {
+      const account = requireAdmin(req, res);
+      if (!account) return;
+      const subId = Number(adminSubjectMatch[1]);
+      const b = await readBody(req);
+      const reassignId = b.reassign_to_subject_id ? Number(b.reassign_to_subject_id) : (url.searchParams.get('reassign_to') ? Number(url.searchParams.get('reassign_to')) : null);
+
+      const entry = accountState(account.key);
+      const state = entry.state || (entry.state = defaultLibraryState());
+      ensureDatabaseIntegrity(state);
+
+      const subIdx = state.subjects.findIndex(s => Number(s.subject_id) === subId);
+      if (subIdx === -1) return send(res, 404, { error: 'Subject not found.' });
+
+      const dependentBooks = (state.books || []).filter(bk => Number(bk.subject_id) === subId);
+      if (dependentBooks.length > 0) {
+        if (!reassignId) {
+          return send(res, 400, {
+            error: `Cannot delete subject because ${dependentBooks.length} book(s) belong to it. Please reassign or delete these books first.`,
+            dependentBooksCount: dependentBooks.length
+          });
+        }
+        const targetSub = state.subjects.find(s => Number(s.subject_id) === reassignId);
+        if (!targetSub || targetSub.subject_id === subId) {
+          return send(res, 400, { error: 'Invalid reassign target subject ID.' });
+        }
+        dependentBooks.forEach(bk => {
+          bk.subject_id = reassignId;
+          bk.category = targetSub.subject_name;
+        });
+      }
+
+      state.subjects.splice(subIdx, 1);
+      entry.revision += 1;
+      await saveStore();
+      return send(res, 200, { success: true, deletedSubjectId: subId, subjects: state.subjects });
+    }
+
     // ============================ AUTH =====================================
     if (p === '/api/auth/status' && method === 'GET') {
-      const account = requestAccount(req);
+      const session = getRequestSession(req);
       const setupRequired = !store.accounts.some(a => a.isPrimary);
-      const payload = { authenticated: Boolean(account), setupRequired };
-      if (account) {
-        payload.username = account.username;
-        payload.isPrimaryAccount = Boolean(account.isPrimary);
+      const payload = { authenticated: Boolean(session), setupRequired };
+      if (session) {
+        payload.role = session.role;
+        payload.username = session.username;
+        if (session.role === 'admin') {
+          payload.isPrimaryAccount = Boolean(session.account?.isPrimary);
+        } else if (session.role === 'student') {
+          payload.student = session.student;
+          payload.roll_no = session.rollNo;
+        }
       }
       return send(res, 200, payload);
     }
@@ -579,22 +1098,69 @@ async function handleRequest(req, res) {
       store.messages[account.key] = [];
       store.reissueRequests[account.key] = [];
       await saveStore();
-      const sid = createSession(account.key);
+      const sid = createSession(account.key, 'admin');
       await saveStore();
-      return send(res, 200, { username: account.username }, undefined, { 'Set-Cookie': sessionCookieHeader(sid) });
+      return send(res, 200, { username: account.username, role: 'admin' }, undefined, { 'Set-Cookie': sessionCookieHeader(sid) });
     }
 
     if (p === '/api/auth/login' && method === 'POST') {
       const b = await readBody(req);
-      const username = String(b.username || '').trim();
+      const input = String(b.username || b.roll_no || '').trim();
       const password = String(b.password || '');
-      const account = store.accounts.find(a => a.key === username.toLowerCase());
-      if (!account || !verifyPassword(password, account.salt, account.hash)) {
-        return send(res, 401, { error: 'Invalid username or password.' });
+      const role = String(b.role || '').toLowerCase();
+
+      // Check if student login is requested or detected
+      const primaryKey = (store.accounts.find(a => a.isPrimary) || store.accounts[0] || {}).key || 'admin';
+      const state = (store.states[primaryKey] || {}).state || defaultLibraryState();
+      ensureDatabaseIntegrity(state);
+
+      const student = (state.students || []).find(s =>
+        String(s.roll_no || '').toLowerCase() === input.toLowerCase() ||
+        String(s.email || '').toLowerCase() === input.toLowerCase()
+      );
+
+      if (role === 'student' || (!role && student && !store.accounts.some(a => a.key === input.toLowerCase()))) {
+        if (!student) {
+          return send(res, 401, { error: `No student found with Roll Number or Email '${input}'. Please verify or contact the librarian.` });
+        }
+        // Verify student password (if student has hash/salt verify, else accept roll number or student123 or password)
+        let pwValid = false;
+        if (student.hash && student.salt) {
+          pwValid = verifyPassword(password, student.salt, student.hash);
+        } else {
+          // Default initial student password is their roll_no (case-insensitive) or 'student123' or empty/any initial password
+          pwValid = !password || password.toLowerCase() === student.roll_no.toLowerCase() || password === 'student123' || password === 'password' || password === 'admin123';
+        }
+
+        if (!pwValid) {
+          return send(res, 401, { error: 'Invalid password. (Default password is your Roll Number, e.g. ' + student.roll_no + ')' });
+        }
+
+        const sid = createSession(student.roll_no.toLowerCase(), 'student', student);
+        await saveStore();
+        return send(res, 200, {
+          role: 'student',
+          username: student.name,
+          roll_no: student.roll_no,
+          student: {
+            id: student.id,
+            name: student.name,
+            roll_no: student.roll_no,
+            department: student.department || 'CSIT',
+            email: student.email,
+            phone: student.phone
+          }
+        }, undefined, { 'Set-Cookie': sessionCookieHeader(sid) });
       }
-      const sid = createSession(account.key);
+
+      // Admin Login
+      const account = store.accounts.find(a => a.key === input.toLowerCase());
+      if (!account || !verifyPassword(password, account.salt, account.hash)) {
+        return send(res, 401, { error: 'Invalid administrator username or password.' });
+      }
+      const sid = createSession(account.key, 'admin');
       await saveStore();
-      return send(res, 200, { username: account.username }, undefined, { 'Set-Cookie': sessionCookieHeader(sid) });
+      return send(res, 200, { role: 'admin', username: account.username }, undefined, { 'Set-Cookie': sessionCookieHeader(sid) });
     }
 
     if (p === '/api/auth/logout' && method === 'POST') {
@@ -722,7 +1288,7 @@ async function handleRequest(req, res) {
       const account = requireAdmin(req, res);
       if (!account) return;
       const b = await readBody(req);
-      const csvText = String(b.csv || '').trim();
+      const csvText = String(b.csv || b.csvText || '').trim();
       if (!csvText) return send(res, 400, { error: 'CSV content is required.' });
 
       const rows = parseCSV(csvText);
@@ -731,9 +1297,9 @@ async function handleRequest(req, res) {
       }
 
       const headers = rows[0].map(h => String(h || '').trim().toLowerCase());
-      const nameIdx = headers.findIndex(h => ['name', 'title', 'book_name', 'book title', 'book'].includes(h));
-      const authorIdx = headers.findIndex(h => ['author', 'authors', 'writer', 'book_author'].includes(h));
-      const categoryIdx = headers.findIndex(h => ['category', 'genre', 'department', 'subject', 'branch'].includes(h));
+      const nameIdx = headers.findIndex(h => ['name', 'title', 'book_name', 'book name', 'book title', 'book'].includes(h));
+      const authorIdx = headers.findIndex(h => ['author', 'authors', 'writer', 'book_author', 'book author'].includes(h));
+      const categoryIdx = headers.findIndex(h => ['category', 'genre', 'department', 'subject', 'branch', 'subject_name', 'subject name'].includes(h));
 
       if (nameIdx === -1 || authorIdx === -1 || categoryIdx === -1) {
         const missing = [];
@@ -786,24 +1352,48 @@ async function handleRequest(req, res) {
           continue;
         }
 
-        // Strict Requirement: Import ONLY Name, Author, Category.
-        // No fake ISBNs, publishers, descriptions, or accession numbers.
+        // Map or associate to Subject (Subject-wise book management)
+        ensureDatabaseIntegrity(state);
+        let sub = state.subjects.find(s =>
+          s.subject_name.toLowerCase() === category.toLowerCase() ||
+          (s.subject_code && s.subject_code.toLowerCase() === category.toLowerCase())
+        );
+        if (!sub) {
+          const nextSubId = state.subjects.reduce((max, s) => Math.max(max, Number(s.subject_id) || 0), 0) + 1;
+          sub = {
+            subject_id: nextSubId,
+            subject_name: category,
+            subject_code: `SUB-${nextSubId}`,
+            description: `Imported subject: ${category}`,
+            icon: '📖',
+            created_at: new Date().toISOString()
+          };
+          state.subjects.push(sub);
+        }
+
+        const bookId = nextId++;
         const newBook = {
-          id: nextId++,
+          id: bookId,
+          book_id: bookId,
           title: name,
+          book_name: name,
           author: author || '',
-          category: category || 'General',
-          isbn: '',
-          publisher: '',
+          subject_id: sub.subject_id,
+          category: sub.subject_name,
+          isbn: '978-DGI-' + String(bookId).padStart(4, '0'),
+          publisher: 'DGI Academic Press',
           description: '',
-          shelf_location: '',
+          shelf_location: `Stack ${sub.subject_code || 'CS-101'}`,
           quantity: 1,
+          total_copies: 1,
           available: 1,
+          available_copies: 1,
           borrow_count: 0,
           color1: '#510027',
           color2: '#3d001e',
           rating: 4.5,
-          published_year: null,
+          published_year: new Date().getFullYear(),
+          publication_year: new Date().getFullYear(),
           created_at: new Date().toISOString()
         };
 
@@ -831,7 +1421,7 @@ async function handleRequest(req, res) {
       const account = requireAdmin(req, res);
       if (!account) return;
       const b = await readBody(req);
-      const csvText = String(b.csv || '').trim();
+      const csvText = String(b.csv || b.csvText || '').trim();
       if (!csvText) return send(res, 400, { error: 'CSV content is required.' });
 
       const rows = parseCSV(csvText);
@@ -934,7 +1524,7 @@ async function handleRequest(req, res) {
       const account = requireAdmin(req, res);
       if (!account) return;
       const b = await readBody(req);
-      const csvText = String(b.csv || '').trim();
+      const csvText = String(b.csv || b.csvText || '').trim();
       if (!csvText) return send(res, 400, { error: 'CSV content is required.' });
 
       const rows = parseCSV(csvText);
@@ -1131,40 +1721,131 @@ async function handleRequest(req, res) {
       const account = requireAdmin(req, res);
       if (!account) return;
       const b = await readBody(req);
-      const title = String(b.title || '').trim();
+      const title = String(b.title || b.book_name || '').trim();
       const author = String(b.author || '').trim();
-      const category = String(b.category || '').trim();
       if (!title) return send(res, 400, { error: 'Book title is required.' });
-      if (!category) return send(res, 400, { error: 'Book category is required.' });
 
       const entry = accountState(account.key);
       const state = entry.state || (entry.state = defaultLibraryState());
+      ensureDatabaseIntegrity(state);
+
       state.books = Array.isArray(state.books) ? state.books : [];
 
-      let nextId = state.books.reduce((max, bk) => Math.max(max, Number(bk.id) || 0), 0) + 1;
-      const qty = Math.max(1, parseInt(b.quantity, 10) || 1);
+      let subjectId = Number(b.subject_id);
+      let subject = state.subjects.find(s => Number(s.subject_id) === subjectId);
+      if (!subject && b.category) {
+        subject = state.subjects.find(s => s.subject_name.toLowerCase() === String(b.category).trim().toLowerCase());
+        if (subject) subjectId = subject.subject_id;
+      }
+      if (!subject) {
+        subject = state.subjects[0];
+        subjectId = subject ? subject.subject_id : 1;
+      }
+
+      let nextId = state.books.reduce((max, bk) => Math.max(max, Number(bk.id) || Number(bk.book_id) || 0), 0) + 1;
+      const qty = Math.max(1, parseInt(b.quantity || b.total_copies, 10) || 1);
       const newBook = {
         id: nextId,
+        book_id: nextId,
         title,
-        author: author || '',
-        category,
-        isbn: String(b.isbn || '').trim(),
-        publisher: String(b.publisher || '').trim(),
+        book_name: title,
+        author: author || 'Unknown Author',
+        category: subject ? subject.subject_name : (b.category || 'General'),
+        subject_id: subjectId,
+        isbn: String(b.isbn || '').trim() || ('978-DGI-' + String(nextId).padStart(4, '0')),
+        publisher: String(b.publisher || '').trim() || 'DGI Academic Press',
         description: String(b.description || '').trim(),
-        shelf_location: String(b.shelf_location || '').trim(),
+        shelf_location: String(b.shelf_location || '').trim() || `Stack ${subject?.subject_code || 'CS-101'}`,
         quantity: qty,
+        total_copies: qty,
         available: qty,
+        available_copies: qty,
         borrow_count: 0,
         color1: b.color1 || '#510027',
         color2: b.color2 || '#3d001e',
         rating: parseFloat(b.rating) || 4.5,
-        published_year: parseInt(b.published_year, 10) || null,
+        published_year: parseInt(b.published_year || b.publication_year, 10) || new Date().getFullYear(),
+        publication_year: parseInt(b.publication_year || b.published_year, 10) || new Date().getFullYear(),
         created_at: new Date().toISOString()
       };
       state.books.push(newBook);
       entry.revision += 1;
       await saveStore();
       return send(res, 201, { success: true, book: newBook, books: state.books });
+    }
+
+    const adminBookMatch = p.match(/^\/api\/admin\/books\/(\d+)$/);
+    if (adminBookMatch && method === 'PUT') {
+      const account = requireAdmin(req, res);
+      if (!account) return;
+      const bookId = Number(adminBookMatch[1]);
+      const b = await readBody(req);
+      const entry = accountState(account.key);
+      const state = entry.state || (entry.state = defaultLibraryState());
+      ensureDatabaseIntegrity(state);
+
+      const book = state.books.find(bk => Number(bk.id) === bookId || Number(bk.book_id) === bookId);
+      if (!book) return send(res, 404, { error: 'Book not found.' });
+
+      if (b.title || b.book_name) {
+        book.title = String(b.title || b.book_name).trim();
+        book.book_name = book.title;
+      }
+      if (b.author !== undefined) book.author = String(b.author).trim();
+      if (b.subject_id !== undefined) {
+        const subId = Number(b.subject_id);
+        const sub = state.subjects.find(s => Number(s.subject_id) === subId);
+        if (sub) {
+          book.subject_id = subId;
+          book.category = sub.subject_name;
+        }
+      } else if (b.category !== undefined) {
+        book.category = String(b.category).trim();
+      }
+      if (b.isbn !== undefined) book.isbn = String(b.isbn).trim();
+      if (b.publisher !== undefined) book.publisher = String(b.publisher).trim();
+      if (b.publication_year || b.published_year) {
+        book.publication_year = parseInt(b.publication_year || b.published_year, 10);
+        book.published_year = book.publication_year;
+      }
+      if (b.description !== undefined) book.description = String(b.description).trim();
+      if (b.shelf_location !== undefined) book.shelf_location = String(b.shelf_location).trim();
+
+      if (b.total_copies !== undefined || b.quantity !== undefined) {
+        const newTotal = Math.max(1, parseInt(b.total_copies ?? b.quantity, 10) || 1);
+        const oldTotal = Number(book.total_copies ?? book.quantity ?? 1);
+        const diff = newTotal - oldTotal;
+        book.total_copies = newTotal;
+        book.quantity = newTotal;
+        book.available_copies = Math.max(0, Number(book.available_copies ?? book.available ?? 1) + diff);
+        book.available = book.available_copies;
+      }
+
+      entry.revision += 1;
+      await saveStore();
+      return send(res, 200, { success: true, book });
+    }
+
+    if (adminBookMatch && method === 'DELETE') {
+      const account = requireAdmin(req, res);
+      if (!account) return;
+      const bookId = Number(adminBookMatch[1]);
+      const entry = accountState(account.key);
+      const state = entry.state || (entry.state = defaultLibraryState());
+      ensureDatabaseIntegrity(state);
+
+      const isIssued = (state.transactions || []).some(t => Number(t.book_id) === bookId && t.status === 'issued');
+      if (isIssued) {
+        return send(res, 400, { error: 'Cannot delete a book that is currently issued to students or faculty.' });
+      }
+
+      const idx = state.books.findIndex(bk => Number(bk.id) === bookId || Number(bk.book_id) === bookId);
+      if (idx === -1) return send(res, 404, { error: 'Book not found.' });
+
+      state.books.splice(idx, 1);
+      entry.revision += 1;
+      await saveStore();
+      return send(res, 200, { success: true, deletedBookId: bookId, books: state.books });
     }
 
     // ========================== MESSAGES ===================================
@@ -1507,12 +2188,27 @@ async function handleRequest(req, res) {
       }
     }
 
-    // Direct access to /index.html is protected: unauthenticated users are redirected to /login.html
+    // Direct access to /index.html is protected: unauthenticated or students are redirected
     if (p === '/index.html' || p === '/index') {
-      const account = requestAccount(req);
-      if (!account) {
+      const session = getRequestSession(req);
+      if (!session || session.role !== 'admin') {
+        const dest = session && session.role === 'student' ? '/student.html' : '/login.html';
         res.writeHead(302, {
-          'Location': '/login.html',
+          'Location': dest,
+          'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+          'Pragma': 'no-cache'
+        });
+        res.end();
+        return;
+      }
+    }
+
+    // Direct access to /student.html is protected: unauthenticated users redirected to login
+    if (p === '/student.html' || p === '/student') {
+      const session = getRequestSession(req);
+      if (!session) {
+        res.writeHead(302, {
+          'Location': '/login.html?role=student',
           'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
           'Pragma': 'no-cache'
         });

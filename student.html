@@ -3,890 +3,738 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#16010b">
-  <title>Student Portal | DGI Central Library (CSIT)</title>
+  <title>Student Portal — Dronacharya Group of Institutions Library</title>
+  <meta name="description" content="Dronacharya Group of Institutions, Greater Noida — Student Library Portal for subject-wise book browsing, issued books tracking, and requests.">
+  <style>html.auth-pending body { visibility: hidden; }</style>
+  <script>
+    document.documentElement.classList.add("auth-pending");
+    window.studentSessionReady = (async function() {
+      if (["http:", "https:"].includes(window.location.protocol)) {
+        try {
+          const res = await fetch("/api/auth/status", { credentials: "same-origin" });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.authenticated) {
+              window.currentStudentInfo = data.student || { name: data.username, roll_no: data.username };
+              window.userRole = data.role;
+              document.documentElement.classList.remove("auth-pending");
+              return true;
+            }
+          }
+        } catch (e) {
+          console.warn("Auth check failed:", e);
+        }
+        window.location.replace("login.html?role=student");
+        return false;
+      }
+      // Offline fallback: check localStorage
+      try {
+        const raw = localStorage.getItem("dgi_student_session") || sessionStorage.getItem("dgi_student_session");
+        if (raw) {
+          window.currentStudentInfo = JSON.parse(raw);
+          document.documentElement.classList.remove("auth-pending");
+          return true;
+        }
+      } catch (e) {}
+      window.location.replace("login.html?role=student");
+      return false;
+    })();
+  </script>
   <link rel="icon" type="image/png" href="logo.png">
+  
+  <!-- CSS Design System -->
   <link rel="stylesheet" href="css/style.css">
   <style>
-    :root {
-      --maroon-dark: #16010b;
-      --maroon-card: #250314;
-      --maroon-card-light: #36071f;
-      --gold-primary: #ffc500;
-      --gold-cream: #fff1cc;
-      --border-maroon: rgba(255, 197, 0, 0.22);
-      --success-green: #10b981;
-      --danger-red: #ef4444;
-      --text-muted: #d4b8c6;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif; }
-    body {
-      background-color: var(--maroon-dark);
-      background-image: radial-gradient(circle at 50% 0%, #3e0422 0%, #16010b 75%);
-      color: #fff;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-    .portal-header {
-      background: rgba(37, 3, 20, 0.95);
-      border-bottom: 1px solid var(--border-maroon);
-      padding: 16px 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      backdrop-filter: blur(8px);
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-    .brand-group {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-    .brand-logo {
-      height: 48px;
-      width: auto;
-      background: #fff;
-      padding: 4px 8px;
-      border-radius: 8px;
-    }
-    .brand-title {
-      font-size: 1.15rem;
+    /* Student Panel Specific Enhancements */
+    .student-badge-pill {
+      background: rgba(255, 197, 0, 0.15);
+      border: 1px solid var(--border-highlight);
+      color: var(--accent-primary);
+      padding: 3px 10px;
+      border-radius: var(--radius-full);
+      font-size: 11px;
       font-weight: 800;
-      color: #fff;
       letter-spacing: 0.5px;
-    }
-    .brand-sub {
-      font-size: 0.78rem;
-      color: var(--gold-primary);
       text-transform: uppercase;
-      letter-spacing: 1px;
-      font-weight: 700;
     }
-    .header-actions {
-      display: flex;
-      gap: 10px;
-      align-items: center;
+    [data-theme="dark"] .student-badge-pill {
+      color: #ffc500;
     }
-    .btn-admin-link {
-      background: transparent;
-      border: 1px solid var(--gold-primary);
-      color: var(--gold-primary);
-      padding: 7px 14px;
-      border-radius: 8px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      text-decoration: none;
-      transition: all 0.2s ease;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .btn-admin-link:hover {
-      background: var(--gold-primary);
-      color: #16010b;
-    }
-    .portal-main {
-      flex: 1;
-      max-width: 1100px;
-      width: 100%;
-      margin: 0 auto;
-      padding: 24px 20px 40px;
-    }
-    .portal-hero {
-      text-align: center;
-      margin-bottom: 28px;
-    }
-    .portal-hero h1 {
-      font-size: 2.1rem;
-      color: var(--gold-cream);
-      margin-bottom: 6px;
-      font-weight: 800;
-    }
-    .portal-hero p {
-      color: var(--text-muted);
-      font-size: 0.95rem;
-    }
-    .tab-nav {
-      display: flex;
-      gap: 8px;
-      background: rgba(37, 3, 20, 0.85);
-      padding: 6px;
-      border-radius: 12px;
-      border: 1px solid var(--border-maroon);
-      margin-bottom: 24px;
-      max-width: 600px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-    .tab-btn {
-      flex: 1;
-      padding: 10px 16px;
-      background: transparent;
-      border: none;
-      color: var(--text-muted);
-      font-weight: 700;
-      font-size: 0.92rem;
-      border-radius: 8px;
+    .subject-card-hover {
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      transition: all 0.2s;
     }
-    .tab-btn.is-active {
-      background: var(--gold-primary);
-      color: #16010b;
-      box-shadow: 0 4px 12px rgba(255, 197, 0, 0.3);
+    .subject-card-hover:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
+      border-color: var(--border-highlight);
     }
-    .card {
-      background: var(--maroon-card);
-      border: 1px solid var(--border-maroon);
-      border-radius: 16px;
-      padding: 24px;
-      box-shadow: 0 16px 36px rgba(0,0,0,0.4);
-      margin-bottom: 24px;
-    }
-    .search-box {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 18px;
-    }
-    .search-input {
-      flex: 1;
-      background: rgba(22, 1, 11, 0.7);
-      border: 1px solid var(--border-maroon);
-      padding: 12px 18px;
-      border-radius: 10px;
-      color: #fff;
-      font-size: 0.95rem;
-      outline: none;
-    }
-    .search-input:focus {
-      border-color: var(--gold-primary);
-      box-shadow: 0 0 0 3px rgba(255, 197, 0, 0.2);
-    }
-    .filter-pills {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-bottom: 22px;
-    }
-    .filter-pill {
-      background: rgba(22, 1, 11, 0.6);
-      border: 1px solid rgba(255, 197, 0, 0.2);
-      color: var(--gold-cream);
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .filter-pill:hover, .filter-pill.is-active {
-      background: rgba(255, 197, 0, 0.25);
-      border-color: var(--gold-primary);
-      color: var(--gold-primary);
-    }
-    .books-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 18px;
-    }
-    .book-card {
-      background: var(--maroon-card-light);
-      border: 1px solid rgba(255, 197, 0, 0.16);
-      border-radius: 12px;
-      padding: 18px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      transition: transform 0.2s, border-color 0.2s;
-    }
-    .book-card:hover {
-      transform: translateY(-3px);
-      border-color: var(--gold-primary);
-    }
-    .book-title {
-      font-size: 1.08rem;
-      font-weight: 700;
-      color: var(--gold-cream);
-      margin-bottom: 6px;
-      line-height: 1.35;
-    }
-    .book-author {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      margin-bottom: 12px;
-    }
-    .book-meta {
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      display: flex;
-      justify-content: space-between;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-      padding-top: 10px;
-      margin-top: 10px;
-    }
-    .badge {
+    .countdown-pill {
       display: inline-flex;
       align-items: center;
       gap: 5px;
       padding: 4px 10px;
-      border-radius: 20px;
-      font-size: 0.76rem;
-      font-weight: 700;
-      letter-spacing: 0.3px;
-    }
-    .badge-available {
-      background: rgba(16, 185, 129, 0.18);
-      color: #34d399;
-      border: 1px solid rgba(16, 185, 129, 0.4);
-    }
-    .badge-issued {
-      background: rgba(239, 68, 68, 0.18);
-      color: #f87171;
-      border: 1px solid rgba(239, 68, 68, 0.4);
-    }
-    .badge-csit {
-      background: rgba(255, 197, 0, 0.18);
-      color: #ffc500;
-      border: 1px solid rgba(255, 197, 0, 0.4);
-    }
-    .stats-bar {
-      display: flex;
-      gap: 16px;
-      flex-wrap: wrap;
-      margin-bottom: 20px;
-    }
-    .stat-pill {
-      background: rgba(0,0,0,0.3);
-      padding: 8px 14px;
-      border-radius: 8px;
-      font-size: 0.85rem;
-      color: var(--gold-cream);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-    .stat-pill strong {
-      color: var(--gold-primary);
-    }
-    .student-lookup-form {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-    .btn-search {
-      background: var(--gold-primary);
-      color: #16010b;
-      font-weight: 700;
-      padding: 12px 24px;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
-      font-size: 0.95rem;
-      transition: opacity 0.2s;
-    }
-    .btn-search:hover {
-      opacity: 0.9;
-    }
-    .sample-chips {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-bottom: 24px;
-      font-size: 0.82rem;
-      color: var(--text-muted);
-    }
-    .sample-chip {
-      background: rgba(255, 197, 0, 0.12);
-      border: 1px solid rgba(255, 197, 0, 0.25);
-      color: var(--gold-primary);
-      padding: 3px 8px;
       border-radius: 6px;
-      cursor: pointer;
-      font-family: monospace;
-      font-size: 0.82rem;
-    }
-    .student-profile-banner {
-      background: linear-gradient(135deg, rgba(62, 4, 34, 0.8) 0%, rgba(37, 3, 20, 0.9) 100%);
-      border: 1px solid var(--border-maroon);
-      border-radius: 14px;
-      padding: 20px;
-      margin-bottom: 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 16px;
-    }
-    .profile-info h3 {
-      font-size: 1.3rem;
-      color: var(--gold-cream);
-      margin-bottom: 4px;
-    }
-    .profile-info p {
-      color: var(--text-muted);
-      font-size: 0.88rem;
-    }
-    .profile-metrics {
-      display: flex;
-      gap: 16px;
-    }
-    .metric-box {
-      text-align: center;
-      background: rgba(0,0,0,0.35);
-      border: 1px solid rgba(255, 197, 0, 0.2);
-      border-radius: 10px;
-      padding: 10px 18px;
-      min-width: 90px;
-    }
-    .metric-number {
-      font-size: 1.5rem;
-      font-weight: 800;
-      color: var(--gold-primary);
-    }
-    .metric-label {
-      font-size: 0.72rem;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .section-title {
-      font-size: 1.15rem;
+      font-size: 12px;
       font-weight: 700;
-      color: var(--gold-cream);
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
     }
-    .table-responsive {
-      overflow-x: auto;
-      margin-bottom: 24px;
+    .countdown-urgent {
+      background: rgba(239, 68, 68, 0.18);
+      color: var(--danger);
+      border: 1px solid rgba(239, 68, 68, 0.35);
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.88rem;
-      text-align: left;
+    .countdown-warning {
+      background: rgba(245, 158, 11, 0.18);
+      color: var(--warning);
+      border: 1px solid rgba(245, 158, 11, 0.35);
     }
-    th {
-      background: rgba(0, 0, 0, 0.4);
-      color: var(--gold-primary);
-      padding: 12px 14px;
-      border-bottom: 1px solid var(--border-maroon);
-      font-weight: 700;
-      font-size: 0.8rem;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    td {
-      padding: 12px 14px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      color: #fff;
-    }
-    tr:hover td {
-      background: rgba(255, 197, 0, 0.04);
-    }
-    .empty-placeholder {
-      text-align: center;
-      padding: 36px 20px;
-      color: var(--text-muted);
-      font-size: 0.95rem;
-    }
-    .footer {
-      text-align: center;
-      padding: 24px 20px;
-      font-size: 0.82rem;
-      color: var(--text-muted);
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(22, 1, 11, 0.95);
-      line-height: 1.6;
-    }
-    .footer-credit {
-      margin-top: 8px;
-      color: var(--gold-primary);
-      font-size: 0.85rem;
-    }
-    @media (max-width: 680px) {
-      .portal-header { flex-direction: column; gap: 12px; align-items: flex-start; }
-      .search-box, .student-lookup-form { flex-direction: column; }
-      .student-profile-banner { flex-direction: column; align-items: flex-start; }
-      .books-grid { grid-template-columns: 1fr; }
+    .countdown-ok {
+      background: rgba(16, 185, 129, 0.18);
+      color: var(--success);
+      border: 1px solid rgba(16, 185, 129, 0.35);
     }
   </style>
 </head>
 <body>
 
-  <!-- Header -->
-  <header class="portal-header">
-    <div class="brand-group">
-      <img class="brand-logo" src="assets/logo.png" alt="DGI Logo" onerror="this.onerror=null;this.src='logo.png';">
-      <div>
-        <div class="brand-title">DGI Central Library</div>
-        <div class="brand-sub">Student Portal &bull; CSIT & All Departments</div>
-      </div>
-    </div>
-    <div class="header-actions">
-      <a href="login.html" class="btn-admin-link">🔒 Librarian Admin Login</a>
-    </div>
-  </header>
-
-  <main class="portal-main">
-    <div class="portal-hero">
-      <h1>Student Library Portal</h1>
-      <p>Search library books, check real-time availability, and view your current loans and borrowing history.</p>
-    </div>
-
-    <!-- Navigation Tabs -->
-    <div class="tab-nav" role="tablist">
-      <button class="tab-btn is-active" id="tab-books-btn" onclick="switchTab('books')">
-        <span>📚</span> Book Catalog & Availability
-      </button>
-      <button class="tab-btn" id="tab-student-btn" onclick="switchTab('student')">
-        <span>🎓</span> My Issued Books & History
-      </button>
-    </div>
-
-    <!-- Tab 1: Book Catalog & Availability -->
-    <section id="tab-books" class="card">
-      <div class="search-box">
-        <input type="text" id="catalog-search" class="search-input" placeholder="Search by Book Title, Author, ISBN, or Subject (e.g. CSIT, Data Structures, Python)..." oninput="filterCatalog()">
-      </div>
-
-      <div class="filter-pills" id="category-pills">
-        <span class="filter-pill is-active" onclick="filterByDept('all')">All Books</span>
-        <span class="filter-pill" onclick="filterByDept('CSIT')">💻 CSIT</span>
-        <span class="filter-pill" onclick="filterByDept('Computer Science')">🖥️ Computer Science</span>
-        <span class="filter-pill" onclick="filterByDept('Information Technology')">🌐 IT</span>
-        <span class="filter-pill" onclick="filterByDept('Electronics')">⚡ Electronics</span>
-        <span class="filter-pill" onclick="filterByDept('Mechanical')">⚙️ Mechanical</span>
-        <span class="filter-pill" onclick="filterByDept('MBA')">📊 Management</span>
-      </div>
-
-      <div class="stats-bar">
-        <div class="stat-pill">Total Titles: <strong id="total-books-count">0</strong></div>
-        <div class="stat-pill">Available Copies on Shelf: <strong id="available-copies-count">0</strong></div>
-        <div class="stat-pill">Filtered Results: <strong id="filtered-books-count">0</strong></div>
-      </div>
-
-      <div class="books-grid" id="books-container">
-        <div class="empty-placeholder">Loading library catalog...</div>
-      </div>
-    </section>
-
-    <!-- Tab 2: My Issued Books & History -->
-    <section id="tab-student" class="card" style="display: none;">
-      <div class="section-title">🔍 Check Your Library Records</div>
-      <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 14px;">
-        Enter your College Roll Number to check which books are currently issued to you and all books borrowed till date.
-      </p>
-
-      <div class="student-lookup-form">
-        <input type="text" id="student-roll-input" class="search-input" placeholder="Enter Roll Number (e.g. CS101, 220133010001)...">
-        <button class="btn-search" onclick="lookupStudentStatus()">Check My Status</button>
-      </div>
-
-      <div class="sample-chips">
-        <span>Quick Samples:</span>
-        <span class="sample-chip" onclick="fillRoll('CS101')">CS101</span>
-        <span class="sample-chip" onclick="fillRoll('CS102')">CS102</span>
-        <span class="sample-chip" onclick="fillRoll('IT201')">IT201</span>
-        <span class="sample-chip" onclick="fillRoll('ME301')">ME301</span>
-      </div>
-
-      <!-- Student Results Area -->
-      <div id="student-result-area" style="display: none;">
-        <!-- Profile Banner -->
-        <div class="student-profile-banner">
-          <div class="profile-info">
-            <h3 id="student-display-name">Student Name</h3>
-            <p>Roll No: <strong id="student-display-roll" style="color:var(--gold-primary);">CS101</strong> &bull; Dept: <strong id="student-display-dept">CSIT</strong></p>
-          </div>
-          <div class="profile-metrics">
-            <div class="metric-box">
-              <div class="metric-number" id="metric-currently-issued">0</div>
-              <div class="metric-label">Books with You</div>
-            </div>
-            <div class="metric-box">
-              <div class="metric-number" id="metric-total-borrowed">0</div>
-              <div class="metric-label">Total Taken Till Date</div>
-            </div>
-            <div class="metric-box">
-              <div class="metric-number" id="metric-fine-due" style="color:#ef4444;">₹0</div>
-              <div class="metric-label">Fine Due</div>
-            </div>
+  <div class="app-container">
+    
+    <!-- ======================================================================
+         STUDENT SIDEBAR NAVIGATION
+         ====================================================================== -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="brand-wrapper">
+          <img class="brand-logo-icon" src="assets/logo-emblem.png" alt="Dronacharya Group of Institutions logo" onerror="this.onerror=null;this.src='logo.png';">
+          <div class="brand-info">
+            <span class="brand-title">DGI LMS</span>
+            <span class="brand-subtitle">Student Portal</span>
           </div>
         </div>
+      </div>
 
-        <!-- 1. Currently Issued Books -->
-        <div class="section-title">📌 Books Currently in Your Possession (Abhi Aapke Pass Hain)</div>
-        <div class="table-responsive">
-          <table>
-            <thead>
-              <tr>
-                <th>Book Title</th>
-                <th>ISBN</th>
-                <th>Issue Date</th>
-                <th>Due Date</th>
-                <th>Days Remaining / Overdue</th>
-                <th>Current Fine</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody id="currently-issued-tbody">
-              <tr><td colspan="7" class="empty-placeholder">No books currently issued to this account.</td></tr>
-            </tbody>
-          </table>
+      <nav class="sidebar-nav">
+        <div class="nav-section-label">General</div>
+        <div class="nav-item active" data-view="dashboard" onclick="window.studentPortal.switchView('dashboard')">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">Dashboard</span>
+        </div>
+        <div class="nav-item" data-view="browse" onclick="window.studentPortal.switchView('browse')">
+          <span class="nav-icon">📖</span>
+          <span class="nav-text">Browse Books</span>
+        </div>
+        <div class="nav-item" data-view="subjects" onclick="window.studentPortal.switchView('subjects')">
+          <span class="nav-icon">🗂️</span>
+          <span class="nav-text">Subjects</span>
         </div>
 
-        <!-- 2. Total Borrowing History -->
-        <div class="section-title" style="margin-top: 30px;">📜 All Books Borrowed Till Date (Puri History)</div>
-        <div class="table-responsive">
-          <table>
-            <thead>
-              <tr>
-                <th>Tx ID</th>
-                <th>Book Title</th>
-                <th>Issue Date</th>
-                <th>Due Date</th>
-                <th>Return Date</th>
-                <th>Status</th>
-                <th>Fine Settlement</th>
-              </tr>
-            </thead>
-            <tbody id="history-tbody">
-              <tr><td colspan="7" class="empty-placeholder">No past loan records found.</td></tr>
-            </tbody>
-          </table>
+        <div class="nav-section-label">My Circulation</div>
+        <div class="nav-item" data-view="issued" onclick="window.studentPortal.switchView('issued')">
+          <span class="nav-icon">🔄</span>
+          <span class="nav-text">My Issued Books</span>
+          <span class="nav-badge" id="nav-issued-count" style="display:none;">0</span>
+        </div>
+        <div class="nav-item" data-view="returns" onclick="window.studentPortal.switchView('returns')">
+          <span class="nav-icon">📥</span>
+          <span class="nav-text">Return History</span>
+        </div>
+        <div class="nav-item" data-view="requests" onclick="window.studentPortal.switchView('requests')">
+          <span class="nav-icon">📑</span>
+          <span class="nav-text">Book Requests</span>
+          <span class="nav-badge" id="nav-requests-count" style="display:none;">0</span>
+        </div>
+
+        <div class="nav-section-label">Account</div>
+        <div class="nav-item" data-view="notifications" onclick="window.studentPortal.switchView('notifications')">
+          <span class="nav-icon">🔔</span>
+          <span class="nav-text">Notifications</span>
+          <span class="nav-badge" id="nav-notif-count" style="display:none;">0</span>
+        </div>
+        <div class="nav-item" data-view="profile" onclick="window.studentPortal.switchView('profile')">
+          <span class="nav-icon">👤</span>
+          <span class="nav-text">My Profile</span>
+        </div>
+        <div class="nav-item" onclick="window.studentPortal.logout()" style="cursor:pointer; color:var(--danger);">
+          <span class="nav-icon">🚪</span>
+          <span class="nav-text">Logout</span>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-profile-badge" style="cursor:pointer;" onclick="window.studentPortal.switchView('profile')">
+          <div class="user-avatar" id="sidebar-student-avatar" style="background:var(--accent-primary); color:#ffc500; font-weight:800;">ST</div>
+          <div class="user-meta">
+            <span class="user-meta-name" id="sidebar-student-name">Student</span>
+            <span class="user-meta-role" id="sidebar-student-roll">Roll No</span>
+          </div>
+        </div>
+        <div class="sidebar-footer-credit-row" style="margin-top:10px;">
+          <div class="app-creator-credit">Designed and Developed by <strong>Ayush Gupta (CSIT)</strong></div>
         </div>
       </div>
-    </section>
-  </main>
+    </aside>
 
-  <!-- Footer -->
-  <footer class="footer">
-    <div>Dronacharya Group of Institutions, Greater Noida &bull; Central Library Management System</div>
-    <div>#27, APJ Abdul Kalam Road, Knowledge Park-III, Greater Noida, Uttar Pradesh - 201306 &bull; Phone: 0120-2322022</div>
-    <div class="footer-credit">Designed and Developed by <strong>Ayush Gupta (CSIT)</strong></div>
-  </footer>
-
-  <script>
-    // State
-    let allBooks = [];
-    let currentDeptFilter = 'all';
-
-    // Tabs
-    function switchTab(tab) {
-      document.getElementById('tab-books-btn').classList.toggle('is-active', tab === 'books');
-      document.getElementById('tab-student-btn').classList.toggle('is-active', tab === 'student');
-      document.getElementById('tab-books').style.display = tab === 'books' ? 'block' : 'none';
-      document.getElementById('tab-student').style.display = tab === 'student' ? 'block' : 'none';
-    }
-
-    function fillRoll(roll) {
-      document.getElementById('student-roll-input').value = roll;
-      lookupStudentStatus();
-    }
-
-    // Load Books Catalog
-    async function loadBooks() {
-      try {
-        let loaded = false;
-        if (["http:", "https:"].includes(window.location.protocol)) {
-          const res = await fetch('/api/student/books');
-          if (res.ok) {
-            const data = await res.json();
-            if (Array.isArray(data.books)) {
-              allBooks = data.books;
-              loaded = true;
-            }
-          }
-        }
-        if (!loaded) {
-          // Local fallback from localStorage
-          const localState = localStorage.getItem('dgi_library_db_v1');
-          if (localState) {
-            const parsed = JSON.parse(localState);
-            if (Array.isArray(parsed.books)) {
-              allBooks = parsed.books.map(b => ({
-                id: b.id,
-                title: b.title,
-                author: b.author,
-                isbn: b.isbn,
-                category: b.category,
-                shelf_location: b.shelf_location,
-                total_copies: Number(b.total_copies) || 1,
-                available_copies: Number(b.available_copies) >= 0 ? Number(b.available_copies) : (Number(b.total_copies) || 1)
-              }));
-              loaded = true;
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('Could not load books from API, using defaults:', err);
-      }
-
-      // Default sample books if empty
-      if (!allBooks || allBooks.length === 0) {
-        allBooks = [
-          { id: 1, title: "Data Structures & Algorithms in C++", author: "Mark Allen Weiss", isbn: "978-0132847377", category: "CSIT", shelf_location: "Stack CS-101", total_copies: 5, available_copies: 3 },
-          { id: 2, title: "Database System Concepts", author: "Silberschatz, Korth", isbn: "978-0078022159", category: "CSIT", shelf_location: "Stack CS-102", total_copies: 6, available_copies: 0 },
-          { id: 3, title: "Operating System Concepts", author: "Abraham Silberschatz", isbn: "978-1118063330", category: "CSIT", shelf_location: "Stack CS-103", total_copies: 4, available_copies: 2 },
-          { id: 4, title: "Computer Networks", author: "Andrew S. Tanenbaum", isbn: "978-0132126953", category: "CSIT", shelf_location: "Stack CS-104", total_copies: 5, available_copies: 4 },
-          { id: 5, title: "Artificial Intelligence: A Modern Approach", author: "Stuart Russell, Peter Norvig", isbn: "978-0136042594", category: "CSIT", shelf_location: "Stack CS-105", total_copies: 3, available_copies: 1 },
-          { id: 6, title: "Web Technologies: HTML, CSS, JS", author: "Uttam K. Roy", isbn: "978-0198066224", category: "Information Technology", shelf_location: "Stack IT-201", total_copies: 4, available_copies: 3 },
-          { id: 7, title: "Electronic Devices & Circuit Theory", author: "Boylestad", isbn: "978-0137692828", category: "Electronics", shelf_location: "Stack EC-301", total_copies: 3, available_copies: 0 },
-          { id: 8, title: "Engineering Mechanics", author: "S. Timoshenko", isbn: "978-0070616806", category: "Mechanical", shelf_location: "Stack ME-401", total_copies: 5, available_copies: 4 }
-        ];
-      }
-
-      renderCatalog(allBooks);
-    }
-
-    function renderCatalog(books) {
-      const container = document.getElementById('books-container');
-      const totalCount = books.length;
-      let availableCopies = 0;
-      books.forEach(b => { availableCopies += (Number(b.available_copies) || 0); });
-
-      document.getElementById('total-books-count').textContent = allBooks.length;
-      document.getElementById('available-copies-count').textContent = availableCopies;
-      document.getElementById('filtered-books-count').textContent = totalCount;
-
-      if (!books.length) {
-        container.innerHTML = `<div class="empty-placeholder">No books found matching your search.</div>`;
-        return;
-      }
-
-      container.innerHTML = books.map(book => {
-        const isAvail = Number(book.available_copies) > 0;
-        const isCsit = String(book.category || "").toLowerCase().includes("csit") || String(book.category || "").toLowerCase().includes("computer");
-        return `
-          <div class="book-card">
-            <div>
-              <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:8px;">
-                <span class="badge ${isCsit ? 'badge-csit' : 'stat-pill'}" style="font-size:0.7rem; padding:2px 8px;">${book.category || "General"}</span>
-                <span class="badge ${isAvail ? 'badge-available' : 'badge-issued'}">
-                  ${isAvail ? `🟢 Available (${book.available_copies} copies)` : '🔴 Currently Issued'}
-                </span>
+    <!-- ======================================================================
+         MAIN CONTENT AREA
+         ====================================================================== -->
+    <main class="main-content">
+      
+      <!-- Top Sticky Navigation Bar -->
+      <header class="topbar">
+        <div class="topbar-main-row">
+          <div class="topbar-left">
+            <button class="mobile-menu-btn" id="mobile-menu-btn" onclick="window.studentPortal.toggleMobileMenu()" title="Toggle Menu">☰</button>
+            
+            <div class="topbar-college-brand">
+              <img src="assets/logo.png" alt="Dronacharya Group of Institutions logo" onerror="this.onerror=null;this.src='logo.png';">
+              <div class="topbar-college-copy">
+                <div class="topbar-college-name" id="topbar-college-name">DRONACHARYA GROUP OF INSTITUTIONS, GREATER NOIDA</div>
+                <div class="topbar-college-subtitle">(Affiliated to Dr. A.P.J. Abdul Kalam Technical University, Lucknow &amp; Approved by AICTE, New Delhi)</div>
               </div>
-              <div class="book-title">${escapeHTML(book.title)}</div>
-              <div class="book-author">By ${escapeHTML(book.author || "Unknown Author")}</div>
-            </div>
-            <div class="book-meta">
-              <span>ISBN: <strong>${escapeHTML(book.isbn || "N/A")}</strong></span>
-              <span>Shelf: <strong>${escapeHTML(book.shelf_location || "Central Rack")}</strong></span>
             </div>
           </div>
-        `;
-      }).join('');
-    }
+        </div>
 
-    function filterByDept(dept) {
-      currentDeptFilter = dept;
-      document.querySelectorAll('.filter-pill').forEach(pill => {
-        pill.classList.toggle('is-active', pill.textContent.includes(dept) || (dept === 'all' && pill.textContent.includes('All')));
-      });
-      filterCatalog();
-    }
+        <div class="topbar-accessibility-row">
+          <div class="header-datetime" id="header-datetime" aria-label="Current date and time">
+            <span id="header-date"></span>
+            <span class="header-datetime-separator" aria-hidden="true">·</span>
+            <span id="header-time"></span>
+          </div>
+          <div class="accessibility-toolbar" role="toolbar" aria-label="Display settings">
+            <button class="accessibility-toolbar-btn toolbar-alerts-btn" type="button" onclick="window.studentPortal.switchView('notifications')" title="View Notifications" aria-label="View notifications">
+              <span aria-hidden="true">🔔</span><span class="topbar-badge" id="topbar-notif-dot" style="display:none;"></span>
+            </button>
+            <div class="accessibility-control-group accent-picker" role="group" aria-label="Theme color">
+              <button class="accent-dot dronacharya" type="button" onclick="window.studentPortal.setAccent('dronacharya')" aria-label="Dronacharya theme" title="Maroon Accent"></button>
+              <button class="accent-dot emerald" type="button" onclick="window.studentPortal.setAccent('emerald')" aria-label="Emerald theme" title="Emerald Accent"></button>
+              <button class="accent-dot violet" type="button" onclick="window.studentPortal.setAccent('violet')" aria-label="Violet theme" title="Violet Accent"></button>
+              <button class="accent-dot teal" type="button" onclick="window.studentPortal.setAccent('teal')" aria-label="Teal theme" title="Teal Accent"></button>
+            </div>
+            <button class="accessibility-toolbar-btn theme-toolbar-btn" id="theme-toggle-btn" type="button" onclick="window.studentPortal.toggleTheme()" title="Switch Light / Dark" aria-label="Toggle Theme">
+              <span class="accessibility-control-icon" id="theme-toggle-icon" aria-hidden="true">☀️</span>
+            </button>
+            <button class="btn btn-secondary btn-sm" type="button" onclick="window.studentPortal.logout()" title="Sign out" style="display:inline-flex;align-items:center;gap:6px;font-weight:700;color:var(--accent-primary);border-color:var(--border-color);margin-left:8px;padding:4px 10px;font-size:12px;cursor:pointer;">
+              <span>🚪</span> Sign Out
+            </button>
+          </div>
+        </div>
+      </header>
 
-    function filterCatalog() {
-      const query = document.getElementById('catalog-search').value.toLowerCase().trim();
-      const filtered = allBooks.filter(book => {
-        const matchesQuery = !query ||
-          (book.title && book.title.toLowerCase().includes(query)) ||
-          (book.author && book.author.toLowerCase().includes(query)) ||
-          (book.isbn && book.isbn.toLowerCase().includes(query)) ||
-          (book.category && book.category.toLowerCase().includes(query));
+      <!-- Views Container -->
+      <div class="content-body" style="padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%;">
 
-        let matchesDept = true;
-        if (currentDeptFilter !== 'all') {
-          matchesDept = book.category && book.category.toLowerCase().includes(currentDeptFilter.toLowerCase());
-        }
+        <!-- ==================================================================
+             VIEW 1: DASHBOARD
+             ================================================================== -->
+        <section class="page-view active" id="view-dashboard">
+          <div class="page-header" style="margin-bottom: 24px;">
+            <div class="page-title-group">
+              <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
+                <h1 style="margin:0;">Welcome, <span id="dash-student-name">Student</span></h1>
+                <span class="student-badge-pill" id="dash-student-branch">CSIT</span>
+              </div>
+              <p>DGI Central Library Student Dashboard & Circulation Portal</p>
+            </div>
+            <div class="page-actions" style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="btn btn-secondary btn-sm" onclick="window.studentPortal.switchView('subjects')">🗂️ Explore Subjects</button>
+              <button class="btn btn-primary btn-sm" onclick="window.studentPortal.switchView('browse')">📖 Browse Catalog</button>
+            </div>
+          </div>
 
-        return matchesQuery && matchesDept;
-      });
-      renderCatalog(filtered);
-    }
+          <!-- 4 Dashboard Overview KPI Cards -->
+          <div class="stat-card-grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; margin-bottom: 28px;">
+            <!-- KPI 1: Total Available Books -->
+            <div class="stat-card" style="cursor:pointer;" onclick="window.studentPortal.switchView('browse')">
+              <div class="stat-icon-wrapper" style="background: rgba(16, 185, 129, 0.15); color: var(--success);">📚</div>
+              <div class="stat-info">
+                <div class="stat-value" id="kpi-available-books">0</div>
+                <div class="stat-label">Total Available Books</div>
+              </div>
+            </div>
 
-    // Student Status & Loan History Lookup
-    async function lookupStudentStatus() {
-      const rollInput = document.getElementById('student-roll-input').value.trim();
-      if (!rollInput) {
-        alert("Please enter a roll number (e.g. CS101)");
-        return;
-      }
+            <!-- KPI 2: Books Currently Issued -->
+            <div class="stat-card" style="cursor:pointer;" onclick="window.studentPortal.switchView('issued')">
+              <div class="stat-icon-wrapper" style="background: rgba(81, 0, 39, 0.15); color: var(--accent-primary);">📖</div>
+              <div class="stat-info">
+                <div class="stat-value" id="kpi-currently-issued">0</div>
+                <div class="stat-label">Books Currently Issued</div>
+              </div>
+            </div>
 
-      let data = null;
-      if (["http:", "https:"].includes(window.location.protocol)) {
-        try {
-          const res = await fetch(`/api/student/status?roll_no=${encodeURIComponent(rollInput)}`);
-          if (res.ok) {
-            data = await res.json();
-          }
-        } catch (e) {
-          console.warn("API student lookup failed, trying local store:", e);
-        }
-      }
+            <!-- KPI 3: Pending Returns -->
+            <div class="stat-card" style="cursor:pointer;" onclick="window.studentPortal.switchView('issued')">
+              <div class="stat-icon-wrapper" style="background: rgba(245, 158, 11, 0.15); color: var(--warning);">⏳</div>
+              <div class="stat-info">
+                <div class="stat-value" id="kpi-pending-returns">0</div>
+                <div class="stat-label">Pending Returns (Active)</div>
+              </div>
+            </div>
 
-      // Local fallback lookup
-      if (!data) {
-        const raw = localStorage.getItem('dgi_library_db_v1');
-        if (raw) {
-          try {
-            const db = JSON.parse(raw);
-            const student = (db.students || []).find(s => String(s.roll_no || "").trim().toLowerCase() === rollInput.toLowerCase());
-            if (student) {
-              const studentTx = (db.transactions || []).filter(t => Number(t.student_id) === Number(student.id));
-              const currentlyIssued = studentTx.filter(t => t.status === 'issued');
-              data = {
-                student: {
-                  id: student.id,
-                  name: student.name,
-                  roll_no: student.roll_no,
-                  department: student.department || 'CSIT',
-                  email: student.email,
-                  phone: student.phone
-                },
-                currently_issued: currentlyIssued,
-                history: studentTx,
-                total_borrowed_count: studentTx.length,
-                current_issued_count: currentlyIssued.length
-              };
-            }
-          } catch (e) {}
-        }
-      }
+            <!-- KPI 4: Overdue Books -->
+            <div class="stat-card" style="cursor:pointer;" onclick="window.studentPortal.switchView('issued')">
+              <div class="stat-icon-wrapper" style="background: rgba(239, 68, 68, 0.15); color: var(--danger);">⚠️</div>
+              <div class="stat-info">
+                <div class="stat-value" id="kpi-overdue-books" style="color:var(--danger);">0</div>
+                <div class="stat-label">Overdue Books</div>
+              </div>
+            </div>
+          </div>
 
-      // Mock demo data if roll number is sample (e.g. CS101) and DB has no record
-      if (!data && rollInput.toUpperCase() === 'CS101') {
-        data = {
-          student: { id: 1, name: "Aarav Sharma", roll_no: "CS101", department: "CSIT", email: "aarav.csit@dronacharya.info" },
-          currently_issued: [
-            { id: 101, book_title: "Database System Concepts", book_isbn: "978-0078022159", issue_date: "2026-11-05", due_date: "2026-11-19", fine: 0, status: "issued" }
-          ],
-          history: [
-            { id: 101, book_title: "Database System Concepts", book_isbn: "978-0078022159", issue_date: "2026-11-05", due_date: "2026-11-19", return_date: null, status: "issued", fine: 0 },
-            { id: 82, book_title: "Data Structures in C++", book_isbn: "978-0132847377", issue_date: "2026-10-10", due_date: "2026-10-24", return_date: "2026-10-22", status: "returned", fine: 0 },
-            { id: 64, book_title: "Operating Systems Principles", book_isbn: "978-1118063330", issue_date: "2026-09-01", due_date: "2026-09-15", return_date: "2026-09-14", status: "returned", fine: 0 }
-          ],
-          total_borrowed_count: 3,
-          current_issued_count: 1
-        };
-      }
+          <!-- Active Loans Section -->
+          <div class="card" style="margin-bottom: 24px; padding: 22px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+              <div>
+                <h3 style="margin:0 0 4px; font-size:18px; font-weight:800;">My Currently Issued Books</h3>
+                <p style="margin:0; font-size:13px; color:var(--text-secondary);">Keep track of your active book loans and due dates.</p>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="window.studentPortal.switchView('issued')">View Full Circulation History →</button>
+            </div>
 
-      const resultArea = document.getElementById('student-result-area');
-      if (!data || !data.student) {
-        alert(`No student found with Roll Number '${rollInput}'. Try CS101 or check with the librarian.`);
-        resultArea.style.display = 'none';
-        return;
-      }
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Book Title</th>
+                    <th>Author</th>
+                    <th>Issue Date</th>
+                    <th>Due Date</th>
+                    <th>Return Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="dash-active-loans-tbody">
+                  <tr><td colspan="6" style="text-align:center; padding:30px; color:var(--text-muted);">No books currently issued to your account.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-      resultArea.style.display = 'block';
+          <!-- Quick Subjects Showcase -->
+          <div class="card" style="padding: 22px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+              <div>
+                <h3 style="margin:0 0 4px; font-size:18px; font-weight:800;">Explore Engineering Subjects</h3>
+                <p style="margin:0; font-size:13px; color:var(--text-secondary);">Browse curriculum textbooks organized by academic subject domain.</p>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="window.studentPortal.switchView('subjects')">All Subjects →</button>
+            </div>
+            <div id="dash-quick-subjects" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:16px;">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+        </section>
 
-      // Fill profile
-      document.getElementById('student-display-name').textContent = data.student.name;
-      document.getElementById('student-display-roll').textContent = data.student.roll_no;
-      document.getElementById('student-display-dept').textContent = data.student.department || 'CSIT';
+        <!-- ==================================================================
+             VIEW 2 & 3: BROWSE BOOKS & SUBJECT-WISE CATALOG
+             ================================================================== -->
+        <section class="page-view" id="view-browse" style="display:none;">
+          <div class="page-header" style="margin-bottom: 20px;">
+            <div class="page-title-group">
+              <h1 id="browse-page-title">Subject-Wise Book Catalog</h1>
+              <p>Explore library titles organized by subject domain or search the entire collection.</p>
+            </div>
+            <div class="page-actions" style="display:flex; gap:8px;">
+              <button class="btn btn-primary btn-sm" id="btn-mode-subjects" onclick="window.studentPortal.setBrowseMode('subjects')">🗂️ Subject Domain Cards</button>
+              <button class="btn btn-secondary btn-sm" id="btn-mode-all" onclick="window.studentPortal.setBrowseMode('all')">📋 All Books Table</button>
+            </div>
+          </div>
 
-      const currentBooks = data.currently_issued || [];
-      const historyBooks = data.history || [];
+          <!-- SUB-VIEW A: SUBJECT CARDS GRID -->
+          <div id="student-subjects-container">
+            <div class="table-wrapper" style="margin-bottom: 20px; padding: 14px 18px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+                <div class="search-input-box" style="flex:1; min-width:240px;">
+                  <span class="search-icon">🔍</span>
+                  <input type="text" id="student-subject-search" placeholder="Search subjects by name or code (e.g. CS-101, Computer Networks)..." oninput="window.studentPortal.renderSubjectCards()">
+                </div>
+                <div style="font-size:13px; color:var(--text-secondary);">
+                  Total Subjects: <strong id="student-kpi-subjects" style="color:var(--accent-primary);">0</strong>
+                </div>
+              </div>
+            </div>
 
-      let totalFineDue = 0;
-      const today = new Date();
-      today.setHours(0,0,0,0);
+            <!-- Subject Cards Grid -->
+            <div class="subjects-grid" id="student-subjects-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:20px;">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
 
-      currentBooks.forEach(tx => {
-        if (tx.due_date) {
-          const dueDate = new Date(tx.due_date + "T00:00:00");
-          if (today > dueDate) {
-            const daysLate = Math.ceil((today - dueDate) / (1000 * 60 * 60 * 24));
-            totalFineDue += (daysLate * 5);
-          }
-        }
-      });
+          <!-- SUB-VIEW B: DEDICATED SUBJECT DETAIL BOOK VIEW -->
+          <div id="student-subject-detail-container" style="display:none;">
+            <!-- Breadcrumbs -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+              <button class="btn btn-secondary btn-sm" onclick="window.studentPortal.backToSubjects()" style="display:inline-flex; align-items:center; gap:6px; font-weight:700; cursor:pointer;">
+                ← Back to All Subjects
+              </button>
+              <div style="font-size:13px; color:var(--text-muted);">
+                <span>Library Catalog</span> &gt; <strong id="student-subject-breadcrumb" style="color:var(--accent-primary);">Subject</strong>
+              </div>
+            </div>
 
-      document.getElementById('metric-currently-issued').textContent = currentBooks.length;
-      document.getElementById('metric-total-borrowed').textContent = historyBooks.length;
-      document.getElementById('metric-fine-due').textContent = `₹${totalFineDue}`;
+            <!-- Subject Hero Banner -->
+            <div class="card" style="padding:22px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+              <div style="display:flex; align-items:center; gap:16px;">
+                <div id="student-subject-detail-icon" style="font-size:40px; width:64px; height:64px; background:rgba(81,0,39,0.15); border:1px solid var(--border-color); border-radius:14px; display:flex; align-items:center; justify-content:center;">💻</div>
+                <div>
+                  <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px; flex-wrap:wrap;">
+                    <h2 id="student-subject-detail-name" style="margin:0; font-size:22px; font-weight:800; color:var(--text-primary);">Computer Science Fundamentals</h2>
+                    <span id="student-subject-detail-code" class="badge badge-accent" style="font-size:12px; font-weight:700;">CS-101</span>
+                  </div>
+                  <p id="student-subject-detail-desc" style="margin:0; font-size:13px; color:var(--text-secondary); max-width:650px;">Core principles, discrete structures, and theoretical computation.</p>
+                </div>
+              </div>
+            </div>
 
-      // 1. Render Currently Issued Books
-      const currentTbody = document.getElementById('currently-issued-tbody');
-      if (!currentBooks.length) {
-        currentTbody.innerHTML = `<tr><td colspan="7" class="empty-placeholder">🟢 No books currently issued. You have 0 active loans!</td></tr>`;
-      } else {
-        currentTbody.innerHTML = currentBooks.map(tx => {
-          let daysText = "-";
-          let fineText = "₹0.00";
-          if (tx.due_date) {
-            const due = new Date(tx.due_date + "T00:00:00");
-            const diffDays = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
-            if (diffDays > 0) {
-              daysText = `<span class="badge badge-available">${diffDays} days left</span>`;
-            } else if (diffDays === 0) {
-              daysText = `<span class="badge badge-csit">Due Today!</span>`;
-            } else {
-              const late = Math.abs(diffDays);
-              daysText = `<span class="badge badge-issued">⚠️ Overdue by ${late} day(s)</span>`;
-              fineText = `<strong style="color:#ef4444;">₹${late * 5}.00</strong>`;
-            }
-          }
-          return `
-            <tr>
-              <td><strong>${escapeHTML(tx.book_title || "Library Book")}</strong></td>
-              <td><code>${escapeHTML(tx.book_isbn || "N/A")}</code></td>
-              <td>${tx.issue_date || "-"}</td>
-              <td><strong style="color:var(--gold-cream);">${tx.due_date || "-"}</strong></td>
-              <td>${daysText}</td>
-              <td>${fineText}</td>
-              <td>
-                <a href="reissue.html" target="_blank" style="color:var(--gold-primary); text-decoration:underline; font-size:0.8rem; font-weight:700;">Request Extension</a>
-              </td>
-            </tr>
-          `;
-        }).join('');
-      }
+            <!-- Subject Detail Filter Bar -->
+            <div class="table-wrapper" style="margin-bottom: 20px;">
+              <div class="table-filter-bar">
+                <div class="filter-left" style="display:flex; gap:10px; flex-wrap:wrap; flex:1;">
+                  <div class="search-input-box" style="flex:1; min-width:200px;">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="student-subject-book-search" placeholder="Search books in this subject (title, author, ISBN)..." oninput="window.studentPortal.renderSubjectBooks()">
+                  </div>
+                  <select class="select-filter" id="student-subject-author-select" onchange="window.studentPortal.renderSubjectBooks()">
+                    <option value="all">All Authors</option>
+                  </select>
+                  <select class="select-filter" id="student-subject-avail-select" onchange="window.studentPortal.renderSubjectBooks()">
+                    <option value="all">All Availability</option>
+                    <option value="available">Available Now</option>
+                    <option value="out_of_stock">Checked Out (0 Available)</option>
+                  </select>
+                  <select class="select-filter" id="student-subject-sort-select" onchange="window.studentPortal.renderSubjectBooks()">
+                    <option value="title_asc">Sort: Title (A-Z)</option>
+                    <option value="title_desc">Sort: Title (Z-A)</option>
+                    <option value="avail_desc">Sort: Available First</option>
+                  </select>
+                </div>
+              </div>
+            </div>
 
-      // 2. Render Total Borrowing History
-      const historyTbody = document.getElementById('history-tbody');
-      if (!historyBooks.length) {
-        historyTbody.innerHTML = `<tr><td colspan="7" class="empty-placeholder">No borrowing history recorded yet.</td></tr>`;
-      } else {
-        historyTbody.innerHTML = historyBooks.map((tx, idx) => {
-          const isReturned = tx.status === 'returned';
-          return `
-            <tr>
-              <td>#${tx.id || (idx + 1)}</td>
-              <td><strong>${escapeHTML(tx.book_title || "Library Book")}</strong></td>
-              <td>${tx.issue_date || "-"}</td>
-              <td>${tx.due_date || "-"}</td>
-              <td>${tx.return_date ? `<span style="color:#34d399;">${tx.return_date}</span>` : '<span style="color:#f87171;">Still Issued</span>'}</td>
-              <td>
-                <span class="badge ${isReturned ? 'badge-available' : 'badge-issued'}">
-                  ${isReturned ? 'Returned' : 'Currently Active'}
-                </span>
-              </td>
-              <td>${Number(tx.fine || 0) > 0 ? `₹${tx.fine} (Settled)` : '₹0 (Clear)'}</td>
-            </tr>
-          `;
-        }).join('');
-      }
-    }
+            <!-- Subject Books Grid / Table -->
+            <div id="student-subject-books-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:18px;">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
 
-    function escapeHTML(str) {
-      if (!str) return "";
-      return String(str).replace(/[&<>'"]/g, tag => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-      }[tag] || tag));
-    }
+          <!-- SUB-VIEW C: ALL BOOKS TABLE VIEW -->
+          <div id="student-all-books-container" style="display:none;">
+            <div class="table-wrapper" style="margin-bottom: 20px;">
+              <div class="table-filter-bar">
+                <div class="filter-left" style="display:flex; gap:10px; flex-wrap:wrap; flex:1;">
+                  <div class="search-input-box" style="flex:1; min-width:220px;">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="student-all-book-search" placeholder="Search across all library books (title, author, ISBN)..." oninput="window.studentPortal.renderAllBooksTable()">
+                  </div>
+                  <select class="select-filter" id="student-all-subject-filter" onchange="window.studentPortal.renderAllBooksTable()">
+                    <option value="all">All Subjects</option>
+                  </select>
+                  <select class="select-filter" id="student-all-avail-filter" onchange="window.studentPortal.renderAllBooksTable()">
+                    <option value="all">All Availability</option>
+                    <option value="available">Available Now</option>
+                    <option value="out_of_stock">Out of Stock</option>
+                  </select>
+                </div>
+              </div>
+            </div>
 
-    // Init
-    loadBooks();
-  </script>
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Book Details</th>
+                    <th>Subject Domain</th>
+                    <th>Author</th>
+                    <th>ISBN</th>
+                    <th>Copies (Avail / Total)</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="student-all-books-tbody">
+                  <!-- Rendered via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 4: MY ISSUED BOOKS
+             ================================================================== -->
+        <section class="page-view" id="view-issued" style="display:none;">
+          <div class="page-header" style="margin-bottom: 20px;">
+            <div class="page-title-group">
+              <h1>My Issued Books</h1>
+              <p>Active library loans, due dates, and return status.</p>
+            </div>
+          </div>
+
+          <div class="card" style="padding: 22px;">
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Book Details</th>
+                    <th>Issue Date</th>
+                    <th>Due Date</th>
+                    <th>Days Remaining</th>
+                    <th>Fine Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="issued-books-tbody">
+                  <!-- Rendered via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 5: RETURN HISTORY
+             ================================================================== -->
+        <section class="page-view" id="view-returns" style="display:none;">
+          <div class="page-header" style="margin-bottom: 20px;">
+            <div class="page-title-group">
+              <h1>Return History</h1>
+              <p>Archive of all previously returned books and transactions.</p>
+            </div>
+          </div>
+
+          <div class="card" style="padding: 22px;">
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Book Details</th>
+                    <th>Issue Date</th>
+                    <th>Returned On</th>
+                    <th>Loan Duration</th>
+                    <th>Fine Settled</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="return-history-tbody">
+                  <!-- Rendered via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 6: BOOK REQUESTS
+             ================================================================== -->
+        <section class="page-view" id="view-requests" style="display:none;">
+          <div class="page-header" style="margin-bottom: 20px;">
+            <div class="page-title-group">
+              <h1>Book Requests</h1>
+              <p>Request titles for reservation or acquisition from the central library.</p>
+            </div>
+            <div class="page-actions">
+              <button class="btn btn-primary btn-sm" onclick="window.studentPortal.openNewRequestModal()">+ Request a Book</button>
+            </div>
+          </div>
+
+          <div class="card" style="padding: 22px;">
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Book Title</th>
+                    <th>Subject / Domain</th>
+                    <th>Request Date</th>
+                    <th>Notes</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="book-requests-tbody">
+                  <!-- Rendered via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 7: NOTIFICATIONS
+             ================================================================== -->
+        <section class="page-view" id="view-notifications" style="display:none;">
+          <div class="page-header" style="margin-bottom: 20px;">
+            <div class="page-title-group">
+              <h1>Notifications & Library Alerts</h1>
+              <p>Important notices regarding due dates, returned books, and library hours.</p>
+            </div>
+          </div>
+
+          <div class="card" style="padding: 22px;">
+            <div id="notifications-list" style="display:flex; flex-direction:column; gap:12px;">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================================
+             VIEW 8: MY PROFILE
+             ================================================================== -->
+        <section class="page-view" id="view-profile" style="display:none;">
+          <div class="page-header" style="margin-bottom: 20px;">
+            <div class="page-title-group">
+              <h1>Student Profile</h1>
+              <p>Registered member credentials and library circulation parameters.</p>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:24px;">
+            <!-- Profile Identity Card -->
+            <div class="card" style="padding: 26px; text-align:center;">
+              <div style="width:84px; height:84px; border-radius:50%; background:var(--accent-primary); color:#ffc500; font-size:32px; font-weight:800; display:flex; align-items:center; justify-content:center; margin:0 auto 16px; border:2px solid var(--border-highlight);" id="profile-avatar">
+                ST
+              </div>
+              <h2 id="profile-name" style="margin:0 0 6px; font-size:22px; font-weight:800;">Student Name</h2>
+              <div style="margin-bottom:16px;">
+                <span class="student-badge-pill" id="profile-roll">Roll No</span>
+              </div>
+              <p id="profile-dept" style="margin:0 0 16px; color:var(--text-secondary); font-size:14px;">Department of Computer Science & Information Technology</p>
+              
+              <div style="border-top:1px solid var(--border-color); padding-top:16px; text-align:left; display:flex; flex-direction:column; gap:10px; font-size:13px;">
+                <div><span style="color:var(--text-muted);">Email:</span> <strong id="profile-email">—</strong></div>
+                <div><span style="color:var(--text-muted);">Phone:</span> <strong id="profile-phone">—</strong></div>
+                <div><span style="color:var(--text-muted);">Semester:</span> <strong id="profile-semester">—</strong></div>
+                <div><span style="color:var(--text-muted);">Institution:</span> <strong>Dronacharya Group of Institutions</strong></div>
+              </div>
+            </div>
+
+            <!-- Circulation Privileges Card -->
+            <div class="card" style="padding: 26px;">
+              <h3 style="margin:0 0 16px; font-size:18px; font-weight:800;">Library Circulation Privileges</h3>
+              
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px;">
+                <div style="background:rgba(0,0,0,0.15); padding:14px; border-radius:10px; border:1px solid var(--border-color);">
+                  <div style="font-size:12px; color:var(--text-muted);">Borrow Limit</div>
+                  <div style="font-size:22px; font-weight:800; color:var(--accent-primary);" id="profile-borrow-limit">3 Books</div>
+                </div>
+                <div style="background:rgba(0,0,0,0.15); padding:14px; border-radius:10px; border:1px solid var(--border-color);">
+                  <div style="font-size:12px; color:var(--text-muted);">Loan Duration</div>
+                  <div style="font-size:22px; font-weight:800; color:var(--accent-primary);">14 Days</div>
+                </div>
+                <div style="background:rgba(0,0,0,0.15); padding:14px; border-radius:10px; border:1px solid var(--border-color);">
+                  <div style="font-size:12px; color:var(--text-muted);">Currently Active</div>
+                  <div style="font-size:22px; font-weight:800; color:var(--text-primary);" id="profile-active-loans">0</div>
+                </div>
+                <div style="background:rgba(0,0,0,0.15); padding:14px; border-radius:10px; border:1px solid var(--border-color);">
+                  <div style="font-size:12px; color:var(--text-muted);">Total Borrowed</div>
+                  <div style="font-size:22px; font-weight:800; color:var(--text-primary);" id="profile-total-borrowed">0</div>
+                </div>
+              </div>
+
+              <div style="background:rgba(81,0,39,0.1); border:1px solid var(--border-color); border-radius:10px; padding:14px; font-size:12px; color:var(--text-secondary); line-height:1.5;">
+                ℹ️ <strong>Library Rules for Students:</strong> Books can be issued for up to 14 days. Please ensure timely returns to avoid overdue fines of ₹1 per day. To renew or replace a lost book, contact the central circulation desk.
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ======================================================================
+       MODAL 1: STUDENT BOOK DETAILS & REQUEST MODAL
+       ====================================================================== -->
+  <div class="modal-backdrop" id="modal-book-details">
+    <div class="modal-card" style="max-width: 620px;">
+      <div class="modal-header">
+        <div class="modal-title" style="display:flex; align-items:center; gap:8px;">
+          <span>📖</span> Book Details
+        </div>
+        <button class="modal-close-btn" onclick="window.studentPortal.closeModal('modal-book-details')">✕</button>
+      </div>
+
+      <div class="modal-body" style="padding: 24px;">
+        <div style="display:flex; gap:18px; margin-bottom:20px; align-items:flex-start;">
+          <div id="modal-book-cover" style="width:72px; height:96px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:32px; flex-shrink:0; background:linear-gradient(135deg, #510027, #250314); color:#ffc500; border:1px solid var(--border-color);">
+            📖
+          </div>
+          <div style="flex:1;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap;">
+              <span class="badge badge-accent" id="modal-book-subject">Subject</span>
+              <span id="modal-book-avail-badge" class="badge badge-success">Available</span>
+            </div>
+            <h2 id="modal-book-title" style="margin:0 0 6px; font-size:20px; font-weight:800; color:var(--text-primary);">Book Title</h2>
+            <div style="font-size:13px; color:var(--text-secondary);">By <strong id="modal-book-author" style="color:var(--text-primary);">Author</strong></div>
+          </div>
+        </div>
+
+        <!-- Specifications Grid -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; font-size:13px; background:rgba(0,0,0,0.15); padding:14px; border-radius:10px; border:1px solid var(--border-color);">
+          <div><span style="color:var(--text-muted);">Subject Code:</span> <strong id="modal-book-code">—</strong></div>
+          <div><span style="color:var(--text-muted);">Publication Year:</span> <strong id="modal-book-year">—</strong></div>
+          <div><span style="color:var(--text-muted);">Publisher:</span> <strong id="modal-book-publisher">—</strong></div>
+          <div><span style="color:var(--text-muted);">ISBN:</span> <code id="modal-book-isbn" style="color:var(--accent-primary); font-weight:700;">—</code></div>
+          <div><span style="color:var(--text-muted);">Available Copies:</span> <strong id="modal-book-avail-copies" style="font-size:15px; color:var(--success);">0</strong></div>
+          <div><span style="color:var(--text-muted);">Total In Library:</span> <strong id="modal-book-total-copies">0</strong></div>
+        </div>
+
+        <!-- Description -->
+        <div style="margin-bottom:20px;">
+          <div style="font-size:12px; font-weight:700; color:var(--text-muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px;">Synopsis / Overview</div>
+          <p id="modal-book-desc" style="font-size:13px; color:var(--text-secondary); line-height:1.5; margin:0;">
+            No detailed description available for this book.
+          </p>
+        </div>
+
+        <!-- Out of stock alert banner (hidden if available) -->
+        <div id="modal-book-stock-alert" style="display:none; background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.3); border-radius:8px; padding:12px; font-size:12px; color:var(--danger); margin-bottom:14px;">
+          ⚠️ <strong>All copies are currently issued.</strong> You may place a reservation request, and library staff will alert you when a copy is returned to the desk.
+        </div>
+      </div>
+
+      <div class="modal-footer" style="padding:16px 24px; display:flex; justify-content:space-between; align-items:center;">
+        <button type="button" class="btn btn-secondary" onclick="window.studentPortal.closeModal('modal-book-details')">Close</button>
+        <button type="button" class="btn btn-primary" id="modal-book-request-btn" onclick="window.studentPortal.requestCurrentModalBook()">
+          📥 Request / Reserve Book
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL 2: MAKE NEW BOOK REQUEST
+       ====================================================================== -->
+  <div class="modal-backdrop" id="modal-make-request">
+    <div class="modal-card" style="max-width: 500px;">
+      <div class="modal-header">
+        <div class="modal-title">📑 Place a Book Request</div>
+        <button class="modal-close-btn" onclick="window.studentPortal.closeModal('modal-make-request')">✕</button>
+      </div>
+      <form id="form-book-request" onsubmit="window.studentPortal.submitBookRequest(event)">
+        <div class="modal-body" style="padding: 20px;">
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label for="request-select-book" style="display:block; font-size:12px; font-weight:700; margin-bottom:6px;">Select Book from Catalog *</label>
+            <select class="form-control" id="request-select-book" required style="width:100%;">
+              <option value="">-- Choose a Title --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="request-notes" style="display:block; font-size:12px; font-weight:700; margin-bottom:6px;">Notes / Purpose (Optional)</label>
+            <textarea class="form-control" id="request-notes" rows="3" placeholder="e.g. For semester 4 project or competitive exams preparation..." style="width:100%; resize:vertical;"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer" style="padding: 16px 20px;">
+          <button type="button" class="btn btn-secondary" onclick="window.studentPortal.closeModal('modal-make-request')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-request">Submit Request</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container" style="position:fixed; bottom:20px; right:20px; z-index:9999; display:flex; flex-direction:column; gap:10px;"></div>
+
+  <!-- Student Portal Controller Script -->
+  <script src="js/student-portal.js"></script>
 </body>
 </html>

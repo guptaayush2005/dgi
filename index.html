@@ -383,70 +383,187 @@
         <!-- ==================================================================
              VIEW 2: BOOKS CATALOG
              ================================================================== -->
+        <!-- ==================================================================
+             VIEW 2: BOOKS CATALOG (SUBJECT-WISE & ALL BOOKS)
+             ================================================================== -->
         <section class="page-view" id="view-books">
           <div class="page-header">
             <div class="page-title-group">
               <h1>Books Catalog</h1>
-              <p>Explore titles, manage stock copies, and issue books directly.</p>
+              <p>Subject-wise book organization, title discovery, and stock inventory.</p>
             </div>
             <div class="page-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
               <button class="btn btn-secondary btn-sm" onclick="window.app.openBookScannerModal()" style="display:inline-flex;align-items:center;gap:6px;">📷 Scan Book (Barcode/OCR)</button>
-              <button class="btn btn-secondary btn-sm" onclick="window.app.openCsvImportModal()" style="display:inline-flex;align-items:center;gap:6px;">📁 Import CSV (3 Columns)</button>
+              <button class="btn btn-secondary btn-sm" onclick="window.app.openCsvImportModal()" style="display:inline-flex;align-items:center;gap:6px;">📁 Import CSV</button>
+              <button class="btn btn-secondary btn-sm" onclick="window.app.openAddSubjectModal()" style="display:inline-flex;align-items:center;gap:6px;">➕ Add Subject</button>
               <button class="btn btn-primary btn-sm" onclick="window.app.openAddBookModal()">+ Add New Book</button>
             </div>
           </div>
 
-          <!-- Filter Controls -->
-          <div class="table-wrapper" style="margin-bottom: 20px;">
-            <div class="table-filter-bar">
-              <div class="filter-left">
-                <div class="search-input-box">
+          <!-- Catalog Mode Switch Tabs -->
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom: 20px;">
+            <div class="tab-mode-toggle" style="display:inline-flex; background:rgba(0,0,0,0.25); padding:4px; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+              <button type="button" class="btn btn-sm btn-primary" id="btn-toggle-subjects-view" onclick="window.app.toggleCatalogMode('subjects')" style="border-radius:6px; font-weight:700;">🗂️ Subject-Wise Catalog</button>
+              <button type="button" class="btn btn-sm btn-secondary" id="btn-toggle-allbooks-view" onclick="window.app.toggleCatalogMode('all')" style="border-radius:6px; font-weight:700; border:none; background:transparent;">📋 All Books Table</button>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-secondary btn-sm" onclick="document.getElementById('books-import-input').click()">📤 Import Excel</button>
+              <input id="books-import-input" type="file" accept=".xlsx" hidden onchange="window.app.importBooksExcel(event)">
+              <button class="btn btn-secondary btn-sm" onclick="window.db.exportCSV('books')">📥 Export CSV</button>
+            </div>
+          </div>
+
+          <!-- SUB-VIEW A: SUBJECT CARDS GRID -->
+          <div id="catalog-subjects-container">
+            <div class="table-wrapper" style="margin-bottom: 20px; padding: 14px 18px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+                <div class="search-input-box" style="flex:1; min-width:240px;">
                   <span class="search-icon">🔍</span>
-                  <input type="text" id="books-search-input" placeholder="Search by title, author, publication, ISBN...">
+                  <input type="text" id="subjects-search-input" placeholder="Search subjects by name, code (e.g. CS-101), or description..." oninput="window.app.renderSubjectsCards()">
                 </div>
-
-                <select class="select-filter" id="books-category-select">
-                  <option value="all">All Categories</option>
-                </select>
-
-                <select class="select-filter" id="books-branch-select" aria-label="Filter books by branch">
-                  <option value="all">All Branches</option>
-                </select>
-
-                <select class="select-filter" id="books-avail-select">
-                  <option value="all">All Availability</option>
-                  <option value="available">Available Now</option>
-                  <option value="out_of_stock">Checked Out (0 Avail)</option>
-                </select>
-              </div>
-
-              <div class="filter-right">
-                <button class="btn btn-secondary btn-sm" onclick="document.getElementById('books-import-input').click()">📤 Import Excel</button>
-                <input id="books-import-input" type="file" accept=".xlsx" hidden onchange="window.app.importBooksExcel(event)">
-                <button class="btn btn-secondary btn-sm" onclick="window.db.exportCSV('books')">📥 Export CSV</button>
+                <div style="display:flex; gap:12px; font-size:13px; color:var(--text-secondary); align-items:center; flex-wrap:wrap;">
+                  <span>Subjects: <strong id="kpi-subjects-count" style="color:var(--accent-primary);">0</strong></span>
+                  <span>&bull;</span>
+                  <span>Catalog Titles: <strong id="kpi-subject-titles-count" style="color:var(--accent-primary);">0</strong></span>
+                  <span>&bull;</span>
+                  <span>Total Copies: <strong id="kpi-subject-copies-count" style="color:var(--accent-primary);">0</strong></span>
+                </div>
               </div>
             </div>
 
-            <!-- Dynamic Category Pills -->
-            <div class="category-pills" id="books-category-pills"></div>
+            <!-- Subject Cards Grid -->
+            <div class="subjects-grid" id="subjects-cards-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(290px, 1fr)); gap:20px;">
+              <!-- Rendered via JS -->
+            </div>
           </div>
 
-          <div class="table-wrapper" id="books-table-view-container">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Book Details</th>
-                  <th>Author</th>
-                  <th>Branch</th>
-                  <th>Category</th>
-                  <th>ISBN / Accession</th>
-                  <th>Copies (Avail/Total)</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="books-table-tbody"></tbody>
-            </table>
+          <!-- SUB-VIEW B: DEDICATED SUBJECT DETAIL VIEW (Hidden initially) -->
+          <div id="catalog-subject-detail-container" style="display:none;">
+            <!-- Breadcrumbs / Back Bar -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+              <button class="btn btn-secondary btn-sm" onclick="window.app.backToSubjects()" style="display:inline-flex; align-items:center; gap:6px; font-weight:700; cursor:pointer;">
+                ← Back to All Subjects
+              </button>
+              <div style="font-size:13px; color:var(--text-muted);">
+                <span>Books Catalog</span> &gt; <strong id="subject-detail-breadcrumb" style="color:var(--accent-primary);">Subject</strong>
+              </div>
+            </div>
+
+            <!-- Subject Hero Banner -->
+            <div class="card" style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:22px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+              <div style="display:flex; align-items:center; gap:16px;">
+                <div id="subject-detail-icon" style="font-size:42px; width:64px; height:64px; background:rgba(81,0,39,0.15); border:1px solid var(--border-color); border-radius:14px; display:flex; align-items:center; justify-content:center;">💻</div>
+                <div>
+                  <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px; flex-wrap:wrap;">
+                    <h2 id="subject-detail-name" style="margin:0; font-size:22px; font-weight:800; color:var(--text-primary);">Computer Science Fundamentals</h2>
+                    <span id="subject-detail-code-badge" class="badge badge-accent" style="font-size:12px; font-weight:700;">CS-101</span>
+                  </div>
+                  <p id="subject-detail-desc" style="margin:0; font-size:13px; color:var(--text-secondary); max-width:650px;">Core computer science principles, discrete structures, and theoretical computation.</p>
+                </div>
+              </div>
+              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                <button class="btn btn-secondary btn-sm" id="btn-edit-current-subject" onclick="window.app.openEditCurrentSubject()">✏️ Edit Subject</button>
+                <button class="btn btn-primary btn-sm" id="btn-add-book-to-subject" onclick="window.app.openAddBookForCurrentSubject()">+ Add Book to Subject</button>
+              </div>
+            </div>
+
+            <!-- Subject Detail Filter Bar -->
+            <div class="table-wrapper" style="margin-bottom: 20px;">
+              <div class="table-filter-bar">
+                <div class="filter-left" style="display:flex; gap:10px; flex-wrap:wrap; flex:1;">
+                  <div class="search-input-box" style="flex:1; min-width:200px;">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="subject-books-search-input" placeholder="Search within this subject (title, author, ISBN, publisher)..." oninput="window.app.renderSubjectBooksTable()">
+                  </div>
+                  <select class="select-filter" id="subject-books-author-select" onchange="window.app.renderSubjectBooksTable()">
+                    <option value="all">All Authors</option>
+                  </select>
+                  <select class="select-filter" id="subject-books-avail-select" onchange="window.app.renderSubjectBooksTable()">
+                    <option value="all">All Availability</option>
+                    <option value="available">Available Now</option>
+                    <option value="out_of_stock">Checked Out (0 Avail)</option>
+                  </select>
+                  <select class="select-filter" id="subject-books-sort-select" onchange="window.app.renderSubjectBooksTable()">
+                    <option value="name_asc">Sort: Title (A-Z)</option>
+                    <option value="name_desc">Sort: Title (Z-A)</option>
+                    <option value="copies_desc">Sort: Copies (High to Low)</option>
+                    <option value="avail_desc">Sort: Available First</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Subject Books Table -->
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Book Details</th>
+                    <th>Author</th>
+                    <th>Publisher</th>
+                    <th>ISBN / Barcode</th>
+                    <th>Copies (Avail/Total)</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="subject-books-table-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- SUB-VIEW C: ALL BOOKS TRADITIONAL TABLE VIEW -->
+          <div id="catalog-all-books-container" style="display:none;">
+            <!-- Filter Controls -->
+            <div class="table-wrapper" style="margin-bottom: 20px;">
+              <div class="table-filter-bar">
+                <div class="filter-left">
+                  <div class="search-input-box">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="books-search-input" placeholder="Search by title, author, publication, ISBN...">
+                  </div>
+
+                  <select class="select-filter" id="books-subject-filter-select">
+                    <option value="all">All Subjects</option>
+                  </select>
+
+                  <select class="select-filter" id="books-category-select">
+                    <option value="all">All Categories</option>
+                  </select>
+
+                  <select class="select-filter" id="books-branch-select" aria-label="Filter books by branch">
+                    <option value="all">All Branches</option>
+                  </select>
+
+                  <select class="select-filter" id="books-avail-select">
+                    <option value="all">All Availability</option>
+                    <option value="available">Available Now</option>
+                    <option value="out_of_stock">Checked Out (0 Avail)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Dynamic Category Pills -->
+              <div class="category-pills" id="books-category-pills"></div>
+            </div>
+
+            <div class="table-wrapper" id="books-table-view-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Book Details</th>
+                    <th>Subject</th>
+                    <th>Author</th>
+                    <th>Branch</th>
+                    <th>ISBN / Accession</th>
+                    <th>Copies (Avail/Total)</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="books-table-tbody"></tbody>
+              </table>
+            </div>
           </div>
         </section>
 
@@ -1046,6 +1163,83 @@
        MODALS
        ======================================================================== -->
 
+  <!-- Modal: Add / Edit Subject -->
+  <div class="modal-backdrop" id="modal-subject">
+    <div class="modal-card" style="max-width: 520px;">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-subject-title">Add New Subject</div>
+        <button class="modal-close-btn" onclick="window.app.closeModal('modal-subject')">✕</button>
+      </div>
+      <form id="form-subject" onsubmit="window.app.handleSubjectFormSubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="subject-modal-id">
+          <div class="form-group">
+            <label for="subject-modal-name">Subject Name *</label>
+            <input type="text" class="form-control" id="subject-modal-name" placeholder="e.g. Computer Science Fundamentals" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="subject-modal-code">Subject Code</label>
+              <input type="text" class="form-control" id="subject-modal-code" placeholder="e.g. CS-101, CSIT201">
+            </div>
+            <div class="form-group">
+              <label for="subject-modal-icon">Subject Icon</label>
+              <div style="display:flex; gap:8px;">
+                <input type="text" class="form-control" id="subject-modal-icon" value="💻" maxlength="8" style="width:70px; text-align:center; font-size:18px;">
+                <select class="form-control" onchange="document.getElementById('subject-modal-icon').value=this.value" style="flex:1;">
+                  <option value="">Quick icon...</option>
+                  <option value="💻">💻 Computer / Tech</option>
+                  <option value="⚡">⚡ Programming / Fast</option>
+                  <option value="🗄️">🗄️ Databases / SQL</option>
+                  <option value="🤖">🤖 AI / Data Science</option>
+                  <option value="⚙️">⚙️ Operating Systems</option>
+                  <option value="🌐">🌐 Networks / Web</option>
+                  <option value="🔒">🔒 Security / Cloud</option>
+                  <option value="📐">📐 Math / Architecture</option>
+                  <option value="📡">📡 Electronics / Circuits</option>
+                  <option value="🔧">🔧 Mechanical</option>
+                  <option value="🏗️">🏗️ Civil Engineering</option>
+                  <option value="📊">📊 Management / Stats</option>
+                  <option value="📖">📖 General Book</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="subject-modal-desc">Subject Description</label>
+            <textarea class="form-control" id="subject-modal-desc" rows="3" placeholder="Brief description of this academic subject domain..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="window.app.closeModal('modal-subject')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="subject-modal-submit-btn">Save Subject</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Delete Subject & Reassignment -->
+  <div class="modal-backdrop" id="modal-delete-subject">
+    <div class="modal-card" style="max-width: 500px;">
+      <div class="modal-header">
+        <div class="modal-title" style="color:var(--danger); display:flex; align-items:center; gap:8px;">⚠️ Delete Subject</div>
+        <button class="modal-close-btn" onclick="window.app.closeModal('modal-delete-subject')">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="delete-subject-id">
+        <p style="font-size:14px; margin-bottom:12px; line-height:1.4;" id="delete-subject-msg">This subject has books assigned to it.</p>
+        <div id="delete-subject-reassign-group" style="margin-top:14px;">
+          <label style="display:block; font-size:12px; font-weight:700; margin-bottom:6px;">Reassign dependent books to another subject:</label>
+          <select class="form-control" id="delete-subject-reassign-select"></select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="window.app.closeModal('modal-delete-subject')">Cancel</button>
+        <button type="button" class="btn btn-danger" onclick="window.app.confirmDeleteSubject()">Confirm Delete</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 1. Add / Edit Book Modal -->
   <div class="modal-backdrop" id="modal-book">
     <div class="modal-card">
@@ -1058,29 +1252,39 @@
           <input type="hidden" id="book-modal-id">
           <div class="form-group">
             <label for="book-modal-title-input">Book Title *</label>
-            <input type="text" class="form-control" id="book-modal-title-input" required>
+            <input type="text" class="form-control" id="book-modal-title-input" placeholder="e.g. Database System Concepts" required>
           </div>
           <div class="form-row">
             <div class="form-group">
               <label for="book-modal-author">Author *</label>
-              <input type="text" class="form-control" id="book-modal-author" required>
+              <input type="text" class="form-control" id="book-modal-author" placeholder="Author name" required>
             </div>
             <div class="form-group">
-              <label for="book-modal-isbn">ISBN / Barcode *</label>
+              <label for="book-modal-isbn">ISBN / Barcode</label>
               <div style="display: flex; gap: 8px;">
-                <input type="text" class="form-control" id="book-modal-isbn" required>
-                <button type="button" class="btn btn-secondary" onclick="window.app.openBookEntryScanner()" title="Scan ISBN barcode or book QR code">📷 Scan ISBN / QR</button>
+                <input type="text" class="form-control" id="book-modal-isbn" placeholder="e.g. 978-0132847377">
+                <button type="button" class="btn btn-secondary" onclick="window.app.openBookEntryScanner()" title="Scan ISBN barcode or book QR code">📷 Scan</button>
               </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="book-modal-subject">Subject Domain *</label>
+              <select class="form-control" id="book-modal-subject" required></select>
+            </div>
+            <div class="form-group">
+              <label for="book-modal-year">Publication Year</label>
+              <input type="number" class="form-control" id="book-modal-year" min="1900" max="2099" placeholder="e.g. 2024">
             </div>
           </div>
           <div class="form-group">
             <label for="book-modal-publisher">Publication / Publisher</label>
-            <input type="text" class="form-control" id="book-modal-publisher" maxlength="200" placeholder="Enter publication or publisher name">
+            <input type="text" class="form-control" id="book-modal-publisher" maxlength="200" placeholder="e.g. Pearson, McGraw-Hill, DGI Press">
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label for="book-modal-category">Category / Genre</label>
-              <input type="text" class="form-control" id="book-modal-category" list="book-category-options" placeholder="Enter book category" required>
+              <label for="book-modal-category">Category / Tag</label>
+              <input type="text" class="form-control" id="book-modal-category" list="book-category-options" placeholder="Enter book category">
               <datalist id="book-category-options"></datalist>
             </div>
             <div class="form-group">

@@ -95,7 +95,17 @@
     </header>
 
     <section class="auth-card" aria-labelledby="auth-heading">
-      <div class="auth-kicker" id="auth-kicker">LIBRARY ACCOUNT</div>
+      <!-- Role Switcher: Librarian vs Student -->
+      <div class="auth-role-tabs" style="display: flex; gap: 8px; margin-bottom: 20px; background: rgba(0,0,0,0.3); padding: 5px; border-radius: 10px; border: 1px solid rgba(255,197,0,0.25);">
+        <button type="button" class="auth-role-btn is-active" id="tab-role-admin" onclick="window.selectAuthRole('admin')" style="flex:1; padding:9px 6px; border:none; border-radius:7px; font-weight:800; font-size:13px; cursor:pointer; background:#ffc500; color:#16010b; display:flex; align-items:center; justify-content:center; gap:6px;">
+          👑 Librarian / Admin
+        </button>
+        <button type="button" class="auth-role-btn" id="tab-role-student" onclick="window.selectAuthRole('student')" style="flex:1; padding:9px 6px; border:none; border-radius:7px; font-weight:800; font-size:13px; cursor:pointer; background:transparent; color:#d4b8c6; display:flex; align-items:center; justify-content:center; gap:6px;">
+          🎓 Student Portal
+        </button>
+      </div>
+
+      <div class="auth-kicker" id="auth-kicker">LIBRARIAN PORTAL</div>
       <h1 id="auth-heading">Sign In</h1>
       <p class="auth-description" id="auth-description">Enter your username and password to access your library.</p>
 
@@ -107,7 +117,7 @@
       <div id="active-session-banner" style="display: none; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.45); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; font-size: 13px; color: #a7f3d0; line-height: 1.4;">
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
           <div><span>✅</span> <span id="active-session-text">You are signed in as administrator.</span></div>
-          <a href="index.html" class="btn btn-primary" style="display: inline-block; padding: 6px 14px; font-size: 12px; font-weight: 800; text-decoration: none; border-radius: 6px; background: #ffc500; color: #16010b;">Go to Dashboard →</a>
+          <a id="active-session-link" href="index.html" class="btn btn-primary" style="display: inline-block; padding: 6px 14px; font-size: 12px; font-weight: 800; text-decoration: none; border-radius: 6px; background: #ffc500; color: #16010b;">Go to Dashboard →</a>
         </div>
       </div>
 
@@ -117,18 +127,28 @@
 
       <form id="login-form" class="auth-form" method="POST" action="javascript:void(0);">
         <div class="auth-field">
-          <label class="auth-label" for="login-username">Username or Email</label>
+          <label class="auth-label" id="label-login-username" for="login-username">Username or Email</label>
           <input class="form-control auth-input" id="login-username" name="username" placeholder="Enter username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
+          
+          <!-- Quick Chips for Students -->
+          <div id="student-quick-chips" style="display: none; margin-top: 8px; flex-wrap: wrap; gap: 6px; font-size: 11px; align-items: center;">
+            <span style="color: #d4b8c6;">Sample Roll Nos:</span>
+            <button type="button" onclick="window.fillStudentCredential('CS101')" style="background: rgba(255,197,0,0.15); border: 1px solid rgba(255,197,0,0.35); color: #ffc500; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-weight: 700;">CS101</button>
+            <button type="button" onclick="window.fillStudentCredential('CS102')" style="background: rgba(255,197,0,0.15); border: 1px solid rgba(255,197,0,0.35); color: #ffc500; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-weight: 700;">CS102</button>
+            <button type="button" onclick="window.fillStudentCredential('CS103')" style="background: rgba(255,197,0,0.15); border: 1px solid rgba(255,197,0,0.35); color: #ffc500; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-weight: 700;">CS103</button>
+            <button type="button" onclick="window.fillStudentCredential('ME101')" style="background: rgba(255,197,0,0.15); border: 1px solid rgba(255,197,0,0.35); color: #ffc500; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-weight: 700;">ME101</button>
+          </div>
         </div>
         <div class="auth-field">
-          <label class="auth-label" for="login-password">Password</label>
+          <label class="auth-label" id="label-login-password" for="login-password">Password</label>
           <div class="auth-password-wrap">
             <input class="form-control auth-input" id="login-password" name="password" placeholder="Enter password" type="password" autocomplete="current-password" required>
             <button class="auth-password-toggle" type="button" data-password-toggle="login-password" aria-label="Show password" aria-pressed="false">Show</button>
           </div>
+          <small id="student-password-hint" style="display: none; color: #ffc500; font-size: 11px; margin-top: 4px;">Default password is your Roll Number (e.g. <code>CS101</code>)</small>
         </div>
         <button class="auth-link-button" id="show-forgot" type="button">Forgot password?</button>
-        <button class="btn btn-primary auth-submit" id="login-submit-btn" type="submit">Sign in</button>
+        <button class="btn btn-primary auth-submit" id="login-submit-btn" type="submit">Sign In</button>
       </form>
 
       <form id="forgot-form" class="auth-form" hidden>
@@ -267,6 +287,69 @@
         } catch {}
       }
 
+      let activeRole = "admin"; // 'admin' | 'student'
+
+      window.selectAuthRole = function(role) {
+        activeRole = role;
+        const tabAdmin = document.getElementById("tab-role-admin");
+        const tabStudent = document.getElementById("tab-role-student");
+        const kicker = document.getElementById("auth-kicker");
+        const heading = document.getElementById("auth-heading");
+        const desc = document.getElementById("auth-description");
+        const modeSwitch = document.getElementById("auth-mode-switch");
+        const forgotBtn = document.getElementById("show-forgot");
+        const userLabel = document.getElementById("label-login-username");
+        const userInput = document.getElementById("login-username");
+        const chips = document.getElementById("student-quick-chips");
+        const hint = document.getElementById("student-password-hint");
+        const submitBtn = document.getElementById("login-submit-btn");
+
+        if (role === "student") {
+          if (tabAdmin) { tabAdmin.style.background = "transparent"; tabAdmin.style.color = "#d4b8c6"; }
+          if (tabStudent) { tabStudent.style.background = "#ffc500"; tabStudent.style.color = "#16010b"; }
+          if (kicker) kicker.textContent = "STUDENT PORTAL";
+          if (heading) heading.textContent = "Student Sign In";
+          if (desc) desc.textContent = "Enter your Roll Number to access subject-wise books and circulation records.";
+          if (modeSwitch) modeSwitch.style.display = "none";
+          if (forgotBtn) forgotBtn.style.display = "none";
+          if (userLabel) userLabel.textContent = "Student Roll Number";
+          if (userInput) { userInput.placeholder = "e.g. CS101, CS102, ME101"; userInput.value = userInput.value || "CS101"; }
+          if (chips) chips.style.display = "flex";
+          if (hint) hint.style.display = "block";
+          if (submitBtn) submitBtn.textContent = "Sign In to Student Portal";
+          const passInput = document.getElementById("login-password");
+          if (passInput && !passInput.value) passInput.value = "CS101";
+        } else {
+          if (tabAdmin) { tabAdmin.style.background = "#ffc500"; tabAdmin.style.color = "#16010b"; }
+          if (tabStudent) { tabStudent.style.background = "transparent"; tabStudent.style.color = "#d4b8c6"; }
+          if (kicker) kicker.textContent = "LIBRARIAN PORTAL";
+          if (heading) heading.textContent = "Sign In";
+          if (desc) desc.textContent = "Enter your username and password to access your library.";
+          if (modeSwitch) modeSwitch.style.display = "flex";
+          if (forgotBtn) forgotBtn.style.display = "inline-block";
+          if (userLabel) userLabel.textContent = "Username or Email";
+          if (userInput) { userInput.placeholder = "Enter username"; if (userInput.value === "CS101") userInput.value = ""; }
+          if (chips) chips.style.display = "none";
+          if (hint) hint.style.display = "none";
+          if (submitBtn) submitBtn.textContent = "Sign In";
+        }
+        showMessage("");
+      };
+
+      window.fillStudentCredential = function(roll) {
+        const userInput = document.getElementById("login-username");
+        const passInput = document.getElementById("login-password");
+        if (userInput) userInput.value = roll;
+        if (passInput) passInput.value = roll;
+        const submitBtn = document.getElementById("login-submit-btn");
+        if (submitBtn) submitBtn.focus();
+      };
+
+      // Check URL params for role
+      if (window.location.search.includes("role=student")) {
+        window.selectAuthRole("student");
+      }
+
       async function submitCredentials(path, username, password) {
         if (submitBtn) {
           submitBtn.disabled = true;
@@ -277,6 +360,7 @@
 
         let authUser = username;
         let loggedIn = false;
+        let returnRole = activeRole;
 
         // 1. If running via web server (HTTP / HTTPS e.g. Vercel or localhost)
         if (["http:", "https:"].includes(window.location.protocol)) {
@@ -285,10 +369,11 @@
               method: "POST",
               credentials: "same-origin",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ username, password })
+              body: JSON.stringify({ role: activeRole, username, password })
             });
             const result = await readResponse(response, "Authentication failed. Invalid username or password.");
             authUser = result.username || username;
+            returnRole = result.role || activeRole;
             loggedIn = true;
           } catch (err) {
             if (submitBtn) {
@@ -308,7 +393,10 @@
           const p = String(password || "");
           const accounts = getLocalAccounts();
 
-          if (u === "admin" && p === "admin123") {
+          if (activeRole === "student") {
+            authUser = username;
+            loggedIn = true;
+          } else if (u === "admin" && p === "admin123") {
             authUser = "admin";
             loggedIn = true;
           } else if (accounts[u] && accounts[u].password === p) {
@@ -330,17 +418,32 @@
         }
 
         if (loggedIn) {
-          const sessionData = JSON.stringify({
-            username: authUser,
-            isPrimary: true,
-            loginTime: new Date().toISOString()
-          });
-          sessionStorage.setItem("dgi_admin_session", sessionData);
-          localStorage.setItem("dgi_admin_session", sessionData);
-          showMessage("Sign in successful. Redirecting to Admin Dashboard...", false);
-          setTimeout(() => {
-            window.location.replace("index.html");
-          }, 200);
+          if (returnRole === "student") {
+            const studentSession = JSON.stringify({
+              username: authUser,
+              roll_no: authUser,
+              name: authUser,
+              loginTime: new Date().toISOString()
+            });
+            sessionStorage.setItem("dgi_student_session", studentSession);
+            localStorage.setItem("dgi_student_session", studentSession);
+            showMessage("Sign in successful. Redirecting to Student Portal...", false);
+            setTimeout(() => {
+              window.location.replace("student.html");
+            }, 250);
+          } else {
+            const sessionData = JSON.stringify({
+              username: authUser,
+              isPrimary: true,
+              loginTime: new Date().toISOString()
+            });
+            sessionStorage.setItem("dgi_admin_session", sessionData);
+            localStorage.setItem("dgi_admin_session", sessionData);
+            showMessage("Sign in successful. Redirecting to Admin Dashboard...", false);
+            setTimeout(() => {
+              window.location.replace("index.html");
+            }, 250);
+          }
         }
       }
 
@@ -387,23 +490,33 @@
           if (res.ok) {
             const data = await res.json();
             if (data.authenticated) {
+              const isStudent = data.role === "student";
+              const sessionKey = isStudent ? "dgi_student_session" : "dgi_admin_session";
               const sessionData = JSON.stringify({
                 username: data.username || "admin",
-                isPrimary: Boolean(data.isPrimaryAccount)
+                isPrimary: Boolean(data.isPrimaryAccount),
+                role: data.role
               });
-              sessionStorage.setItem("dgi_admin_session", sessionData);
-              localStorage.setItem("dgi_admin_session", sessionData);
+              sessionStorage.setItem(sessionKey, sessionData);
+              localStorage.setItem(sessionKey, sessionData);
               const activeBanner = document.getElementById("active-session-banner");
               const activeText = document.getElementById("active-session-text");
+              const activeLink = document.getElementById("active-session-link");
               if (activeBanner && activeText) {
-                activeText.innerHTML = `You are already signed in as <strong>${data.username || "admin"}</strong>.`;
+                activeText.innerHTML = `You are already signed in as ${isStudent ? 'student' : 'administrator'} <strong>${data.username || (data.student && data.student.name) || "user"}</strong>.`;
+                if (activeLink) {
+                  activeLink.href = isStudent ? "student.html" : "index.html";
+                  activeLink.textContent = isStudent ? "Go to Student Portal →" : "Go to Dashboard →";
+                }
                 activeBanner.style.display = "block";
               }
               const userInput = document.getElementById("login-username");
-              if (userInput && !userInput.value) userInput.value = data.username || "admin";
+              if (userInput && !userInput.value) userInput.value = data.username || "";
             } else {
               sessionStorage.removeItem("dgi_admin_session");
               localStorage.removeItem("dgi_admin_session");
+              sessionStorage.removeItem("dgi_student_session");
+              localStorage.removeItem("dgi_student_session");
             }
             if (data.setupRequired) {
               if (loginForm) loginForm.hidden = true;

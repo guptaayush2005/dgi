@@ -299,22 +299,146 @@ class LibraryDatabase {
     };
   }
 
+  // --- Subjects CRUD ---
+  getSubjects() {
+    const data = this._getData();
+    if (!Array.isArray(data.subjects) || data.subjects.length === 0) {
+      data.subjects = [
+        { subject_id: 1, subject_name: "Computer Science Fundamentals", subject_code: "CS-101", description: "Core computer science principles, discrete structures, and theoretical computation.", icon: "💻" },
+        { subject_id: 2, subject_name: "Programming & Software Development", subject_code: "CS-102", description: "Object-oriented programming, C++, Java, Python, and data structures.", icon: "⚡" },
+        { subject_id: 3, subject_name: "Databases & Information Systems", subject_code: "CS-103", description: "Relational database management, SQL, query processing, and data architecture.", icon: "🗄️" },
+        { subject_id: 4, subject_name: "Artificial Intelligence & Data Science", subject_code: "CS-104", description: "Machine learning algorithms, neural networks, computer vision, and modern AI.", icon: "🤖" },
+        { subject_id: 5, subject_name: "Operating Systems", subject_code: "CS-105", description: "Kernel architecture, process synchronization, memory management, and file systems.", icon: "⚙️" },
+        { subject_id: 6, subject_name: "Computer Networks", subject_code: "CS-106", description: "Network layers, protocols, TCP/IP, wireless routing, and data communication.", icon: "🌐" },
+        { subject_id: 7, subject_name: "Cyber Security & Cloud", subject_code: "CS-107", description: "Network security, cryptography, cloud computing infrastructure, and virtualization.", icon: "🔒" },
+        { subject_id: 8, subject_name: "Software Engineering & Architecture", subject_code: "CS-108", description: "Software engineering methodologies, system design patterns, and clean code principles.", icon: "📐" },
+        { subject_id: 9, subject_name: "Electronics & Communication", subject_code: "EC-201", description: "Semiconductor physics, analog and digital electronics, and circuit theory.", icon: "📡" },
+        { subject_id: 10, subject_name: "Mechanical Engineering", subject_code: "ME-301", description: "Engineering mechanics, statics, dynamics, thermodynamics, and manufacturing.", icon: "🔧" },
+        { subject_id: 11, subject_name: "Mathematics & Applied Sciences", subject_code: "AS-101", description: "Engineering mathematics, calculus, linear algebra, and numerical techniques.", icon: "📊" }
+      ];
+      this._saveData(data);
+    }
+    return data.subjects;
+  }
+
+  getSubjectById(id) {
+    return this.getSubjects().find(s => Number(s.subject_id) === Number(id));
+  }
+
+  addSubject(subjectData) {
+    const data = this._getData();
+    const name = String(subjectData.subject_name || subjectData.name || "").trim();
+    const code = String(subjectData.subject_code || subjectData.code || "").trim();
+    if (!name) throw new Error("Enter the subject name.");
+
+    data.subjects = this.getSubjects();
+    const dup = data.subjects.find(s => s.subject_name.toLowerCase() === name.toLowerCase() || (code && s.subject_code && s.subject_code.toLowerCase() === code.toLowerCase()));
+    if (dup) {
+      throw new Error(`A subject with this name (${dup.subject_name}) or code (${dup.subject_code}) already exists.`);
+    }
+
+    const nextId = data.subjects.reduce((max, s) => Math.max(max, Number(s.subject_id) || 0), 0) + 1;
+    const newSubject = {
+      subject_id: nextId,
+      subject_name: name,
+      subject_code: code,
+      description: String(subjectData.description || "").trim(),
+      icon: String(subjectData.icon || "📖").trim(),
+      created_at: new Date().toISOString()
+    };
+    data.subjects.push(newSubject);
+    this._saveData(data);
+    return newSubject;
+  }
+
+  updateSubject(id, subjectData) {
+    const data = this._getData();
+    data.subjects = this.getSubjects();
+    const idx = data.subjects.findIndex(s => Number(s.subject_id) === Number(id));
+    if (idx === -1) throw new Error("Subject not found.");
+
+    const name = String(subjectData.subject_name || subjectData.name || "").trim();
+    const code = String(subjectData.subject_code || subjectData.code || "").trim();
+    if (!name) throw new Error("Enter the subject name.");
+
+    const dup = data.subjects.find(s => Number(s.subject_id) !== Number(id) && (s.subject_name.toLowerCase() === name.toLowerCase() || (code && s.subject_code && s.subject_code.toLowerCase() === code.toLowerCase())));
+    if (dup) throw new Error("Another subject with this name or code already exists.");
+
+    const oldName = data.subjects[idx].subject_name;
+    data.subjects[idx] = {
+      ...data.subjects[idx],
+      subject_name: name,
+      subject_code: code,
+      description: String(subjectData.description !== undefined ? subjectData.description : data.subjects[idx].description).trim(),
+      icon: String(subjectData.icon || data.subjects[idx].icon || "📖").trim()
+    };
+
+    // Update categories on books belonging to this subject
+    (data.books || []).forEach(b => {
+      if (Number(b.subject_id) === Number(id) && (!b.category || b.category === oldName)) {
+        b.category = name;
+      }
+    });
+
+    this._saveData(data);
+    return data.subjects[idx];
+  }
+
+  deleteSubject(id, reassignSubjectId = null) {
+    const data = this._getData();
+    data.subjects = this.getSubjects();
+    const idx = data.subjects.findIndex(s => Number(s.subject_id) === Number(id));
+    if (idx === -1) throw new Error("Subject not found.");
+
+    const dependentBooks = (data.books || []).filter(b => Number(b.subject_id) === Number(id));
+    if (dependentBooks.length > 0) {
+      if (!reassignSubjectId) {
+        throw new Error(`Cannot delete subject because ${dependentBooks.length} book(s) belong to it. Reassign or delete the books first.`);
+      }
+      const targetSub = data.subjects.find(s => Number(s.subject_id) === Number(reassignSubjectId));
+      if (!targetSub || Number(targetSub.subject_id) === Number(id)) {
+        throw new Error("Invalid reassignment target subject.");
+      }
+      dependentBooks.forEach(b => {
+        b.subject_id = Number(reassignSubjectId);
+        b.category = targetSub.subject_name;
+      });
+    }
+
+    data.subjects.splice(idx, 1);
+    this._saveData(data);
+    return true;
+  }
+
+  getBooksBySubjectId(subjectId) {
+    return this.getBooks().filter(b => Number(b.subject_id) === Number(subjectId));
+  }
+
   // --- Books CRUD ---
   getBooks() {
     return this._getData().books || [];
   }
 
   getBookById(id) {
-    return this.getBooks().find(b => b.id === Number(id));
+    return this.getBooks().find(b => Number(b.id) === Number(id) || Number(b.book_id) === Number(id));
   }
 
   addBook(bookData) {
     const data = this._getData();
-    if (!String(bookData.category || "").trim()) {
-      throw new Error("Enter the book category.");
+    const newId = data.books.length > 0 ? Math.max(...data.books.map(b => Number(b.id) || Number(b.book_id) || 0)) + 1 : 1;
+    const qty = parseInt(bookData.quantity || bookData.total_copies) || 1;
+
+    let subjectId = Number(bookData.subject_id);
+    let subjects = this.getSubjects();
+    let sub = subjects.find(s => Number(s.subject_id) === subjectId);
+    if (!sub && bookData.category) {
+      sub = subjects.find(s => s.subject_name.toLowerCase() === String(bookData.category).trim().toLowerCase());
+      if (sub) subjectId = sub.subject_id;
     }
-    const newId = data.books.length > 0 ? Math.max(...data.books.map(b => b.id)) + 1 : 1;
-    const qty = parseInt(bookData.quantity) || 1;
+    if (!sub) {
+      sub = subjects[0];
+      subjectId = sub ? sub.subject_id : 1;
+    }
 
     // Pick vibrant gradient pair
     const palettes = [
@@ -327,27 +451,36 @@ class LibraryDatabase {
     ];
     const chosenPalette = palettes[Math.floor(Math.random() * palettes.length)];
 
+    const title = (bookData.title || bookData.book_name || "").trim();
+    if (!title) throw new Error("Enter the book title.");
+
     const newBook = {
       id: newId,
-      title: bookData.title.trim(),
-      author: bookData.author.trim(),
-      publisher: String(bookData.publisher || "").trim(),
-      isbn: bookData.isbn.trim(),
-      category: bookData.category.trim(),
+      book_id: newId,
+      title: title,
+      book_name: title,
+      author: (bookData.author || "Unknown Author").trim(),
+      publisher: String(bookData.publisher || "DGI Academic Press").trim(),
+      isbn: String(bookData.isbn || "").trim() || `978-DGI-${String(newId).padStart(4, '0')}`,
+      subject_id: subjectId,
+      category: sub ? sub.subject_name : (bookData.category || "General"),
       quantity: qty,
+      total_copies: qty,
       available: qty,
+      available_copies: qty,
       borrow_count: 0,
       description: bookData.description || "Comprehensive academic reference book.",
+      shelf_location: bookData.shelf_location || `Stack ${sub?.subject_code || "CS-101"}`,
       color1: bookData.color1 || chosenPalette[0],
       color2: bookData.color2 || chosenPalette[1],
       rating: parseFloat(bookData.rating) || 4.5,
-      published_year: parseInt(bookData.published_year) || new Date().getFullYear(),
+      published_year: parseInt(bookData.published_year || bookData.publication_year) || new Date().getFullYear(),
+      publication_year: parseInt(bookData.publication_year || bookData.published_year) || new Date().getFullYear(),
       created_at: new Date().toISOString()
     };
 
     data.books.push(newBook);
     this._saveData(data);
-    this.classifyBookGenres();
     return newBook;
   }
 
@@ -417,21 +550,32 @@ class LibraryDatabase {
     };
     for (const book of imported) {
       const palette = palettes[Math.floor(Math.random() * palettes.length)];
+      const bookId = nextId++;
+      let sub = this.getSubjects().find(s => s.subject_name.toLowerCase() === String(book.category || book.subject || "").trim().toLowerCase());
+      if (!sub) sub = this.getSubjects()[0];
       data.books.push({
         ...book,
         categorySource: "auto",
-        id: nextId++,
+        id: bookId,
+        book_id: bookId,
+        title: book.title,
+        book_name: book.title,
         author: String(book.author || "").trim(),
-        publisher: String(book.publisher || "").trim(),
+        subject_id: sub ? sub.subject_id : 1,
+        category: sub ? sub.subject_name : (book.category || "General"),
+        publisher: String(book.publisher || "DGI Academic Press").trim(),
         isbn: String(book.isbn || book.accessionNo || fallbackIsbn(book.importKey)).trim(),
         quantity: book.quantity,
+        total_copies: book.quantity,
         available: book.quantity,
+        available_copies: book.quantity,
         borrow_count: 0,
         description: String(book.remarks || book.subject || "").trim() || "Imported from Excel accession register.",
         color1: palette[0],
         color2: palette[1],
         rating: 4.5,
         published_year: parseInt(book.published_year, 10) || new Date().getFullYear(),
+        publication_year: parseInt(book.published_year, 10) || new Date().getFullYear(),
         created_at: new Date().toISOString()
       });
     }
@@ -547,6 +691,11 @@ class LibraryDatabase {
         book.category = category;
         changed++;
       }
+      if (!book.subject_id) {
+        const sub = (data.subjects || []).find(s => s.subject_name.toLowerCase() === category.toLowerCase());
+        book.subject_id = sub ? sub.subject_id : 1;
+        changed++;
+      }
       if (book.categorySource !== "auto") {
         book.categorySource = "auto";
         changed++;
@@ -558,22 +707,38 @@ class LibraryDatabase {
 
   updateBook(id, updateData) {
     const data = this._getData();
-    const idx = data.books.findIndex(b => b.id === Number(id));
+    const idx = data.books.findIndex(b => Number(b.id) === Number(id) || Number(b.book_id) === Number(id));
     if (idx === -1) return null;
-    if (Object.prototype.hasOwnProperty.call(updateData, "category") && !String(updateData.category).trim()) {
-      throw new Error("Enter the book category.");
-    }
 
     const old = data.books[idx];
-    const qtyDiff = (parseInt(updateData.quantity) || old.quantity) - old.quantity;
-    const newAvailable = Math.max(0, old.available + qtyDiff);
+    const newQty = parseInt(updateData.quantity || updateData.total_copies) || old.quantity || old.total_copies || 1;
+    const oldQty = old.quantity || old.total_copies || 1;
+    const qtyDiff = newQty - oldQty;
+    const newAvailable = Math.max(0, (old.available_copies ?? old.available ?? 1) + qtyDiff);
+
+    let subjectId = updateData.subject_id !== undefined ? Number(updateData.subject_id) : (old.subject_id || 1);
+    let sub = this.getSubjectById(subjectId);
+    let category = sub ? sub.subject_name : (updateData.category || old.category || "General");
+
+    const title = updateData.title ? String(updateData.title).trim() : (old.title || old.book_name);
 
     data.books[idx] = {
       ...old,
       ...updateData,
-      ...(Object.prototype.hasOwnProperty.call(updateData, "category") ? { categorySource: "manual" } : {}),
-      quantity: parseInt(updateData.quantity) || old.quantity,
-      available: newAvailable
+      id: old.id,
+      book_id: old.book_id || old.id,
+      title: title,
+      book_name: title,
+      subject_id: subjectId,
+      category: category,
+      total_copies: newQty,
+      quantity: newQty,
+      available_copies: newAvailable,
+      available: newAvailable,
+      publisher: updateData.publisher !== undefined ? String(updateData.publisher).trim() : (old.publisher || "DGI Academic Press"),
+      publication_year: parseInt(updateData.publication_year || updateData.published_year) || old.publication_year || 2024,
+      published_year: parseInt(updateData.published_year || updateData.publication_year) || old.published_year || 2024,
+      categorySource: "manual"
     };
 
     this._saveData(data);
