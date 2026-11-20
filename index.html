@@ -2035,15 +2035,15 @@
 
   <!-- Modal: Admin Book Details -->
   <div class="modal-backdrop" id="modal-admin-book-details">
-    <div class="modal-box" style="max-width: 600px;">
+    <div class="modal-card book-details-modal-card" id="admin-book-details-card" style="max-width: 580px;">
       <div class="modal-header">
-        <div class="modal-title" id="admin-book-detail-title">Book Details</div>
-        <button class="modal-close-btn" onclick="window.app.closeModal('modal-admin-book-details')">&times;</button>
+        <div class="modal-title" id="admin-book-detail-title" style="color: #4B0028; font-weight: 800;">📖 Book Details</div>
+        <button class="modal-close-btn" onclick="window.app.closeModal('modal-admin-book-details')" title="Close">&times;</button>
       </div>
       <div class="modal-body" id="admin-book-detail-body">
         <!-- Rendered via JS -->
       </div>
-      <div class="modal-footer" id="admin-book-detail-footer" style="display:flex; justify-content:flex-end; gap:8px;">
+      <div class="modal-footer" id="admin-book-detail-footer">
         <!-- Action buttons -->
       </div>
     </div>

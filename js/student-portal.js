@@ -689,7 +689,7 @@ class StudentPortal {
     if (isbnEl) isbnEl.textContent = book.isbn || "978-DGI-LIB";
     if (availCopiesEl) {
       availCopiesEl.textContent = available;
-      availCopiesEl.style.color = available > 0 ? "var(--success)" : "var(--danger)";
+      availCopiesEl.style.color = available > 0 ? "#059669" : "#dc2626";
     }
     if (totalCopiesEl) totalCopiesEl.textContent = total;
     if (descEl) descEl.textContent = book.description || `Authoritative textbook for ${subject ? subject.subject_name : "engineering curriculum"} at Dronacharya Group of Institutions.`;

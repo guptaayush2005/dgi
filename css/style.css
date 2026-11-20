@@ -2418,3 +2418,331 @@ button, input, select, textarea {
 }
 
 [hidden] { display:none !important; }
+
+/* ==========================================================================
+   Book Details Modal Popup — High-Contrast Solid Warm Cream Theme
+   Fixes dull/faded appearance, enhances visibility, typography & contrast
+   ========================================================================== */
+#modal-admin-book-details.modal-backdrop,
+#modal-book-details.modal-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2500 !important;
+  background: rgba(10, 4, 8, 0.70) !important;
+  backdrop-filter: blur(5px) !important;
+  -webkit-backdrop-filter: blur(5px) !important;
+  display: none;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 20px !important;
+}
+
+#modal-admin-book-details.modal-backdrop.active,
+#modal-book-details.modal-backdrop.active {
+  display: flex !important;
+}
+
+#modal-admin-book-details .book-details-modal-card,
+#modal-admin-book-details .modal-box,
+#modal-admin-book-details .modal-card,
+#modal-book-details .book-details-modal-card,
+#modal-book-details .modal-card {
+  background: #FFF9EB !important;
+  color: #292929 !important;
+  border: 1px solid #dfd3ba !important;
+  border-radius: 14px !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(75, 0, 40, 0.12) !important;
+  opacity: 1 !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  width: 100% !important;
+  max-width: 580px !important;
+  max-height: 86vh !important;
+  overflow-y: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  animation: modalScaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Modal Header */
+#modal-admin-book-details .modal-header,
+#modal-book-details .modal-header {
+  background: #FFF9EB !important;
+  border-bottom: 1px solid #ead7b3 !important;
+  padding: 16px 22px 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-shrink: 0 !important;
+}
+
+#modal-admin-book-details .modal-title,
+#modal-book-details .modal-title {
+  color: #4B0028 !important;
+  font-size: 19px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.2px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+#modal-admin-book-details .modal-close-btn,
+#modal-book-details .modal-close-btn {
+  color: #4B0028 !important;
+  background: transparent !important;
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  border: none !important;
+  cursor: pointer !important;
+  padding: 2px 8px !important;
+  border-radius: 6px !important;
+  line-height: 1 !important;
+  opacity: 0.85 !important;
+  transition: all 0.15s ease !important;
+}
+
+#modal-admin-book-details .modal-close-btn:hover,
+#modal-book-details .modal-close-btn:hover {
+  background: #ecddb9 !important;
+  color: #2b0017 !important;
+  opacity: 1 !important;
+}
+
+/* Modal Body */
+#modal-admin-book-details .modal-body,
+#modal-book-details .modal-body {
+  background: #FFF9EB !important;
+  color: #292929 !important;
+  padding: 18px 22px 12px !important;
+  overflow-y: auto !important;
+  flex: 1 1 auto !important;
+}
+
+/* Headings inside popup */
+#modal-admin-book-details h2,
+#modal-book-details h2,
+#modal-admin-book-details .book-details-title,
+#modal-book-details .book-details-title,
+#modal-book-title {
+  color: #4B0028 !important;
+  font-size: 19px !important;
+  font-weight: 800 !important;
+  margin: 0 0 6px !important;
+  line-height: 1.3 !important;
+}
+
+/* Normal Text inside popup */
+#modal-admin-book-details p,
+#modal-book-details p,
+#modal-admin-book-details span,
+#modal-book-details span,
+#modal-admin-book-details div,
+#modal-book-details div,
+#modal-admin-book-details strong,
+#modal-book-details strong {
+  color: #292929;
+}
+
+/* Section Subheadings */
+#modal-admin-book-details .section-kicker,
+#modal-book-details .section-kicker,
+#modal-admin-book-details .modal-body div[style*="uppercase"],
+#modal-book-details .modal-body div[style*="uppercase"] {
+  color: #4B0028 !important;
+  font-weight: 800 !important;
+  font-size: 11px !important;
+  letter-spacing: 0.6px !important;
+}
+
+/* Specifications Grid Container */
+#modal-admin-book-details .book-details-grid,
+#modal-book-details .book-details-grid,
+#modal-admin-book-details div[style*="grid-template-columns:1fr 1fr"],
+#modal-book-details div[style*="grid-template-columns:1fr 1fr"] {
+  background: #FFFFFF !important;
+  padding: 12px 16px !important;
+  border-radius: 10px !important;
+  border: 1px solid #ebd9b8 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04) !important;
+  margin-bottom: 12px !important;
+  font-size: 13px !important;
+}
+
+#modal-admin-book-details .spec-label,
+#modal-book-details .spec-label {
+  color: #555555 !important;
+  font-weight: 600 !important;
+}
+
+#modal-admin-book-details .spec-value,
+#modal-book-details .spec-value {
+  color: #292929 !important;
+  font-weight: 700 !important;
+}
+
+/* Badges */
+#modal-admin-book-details .badge-success,
+#modal-book-details .badge-success,
+#modal-book-avail-badge {
+  background: #059669 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  padding: 4px 10px !important;
+  border-radius: 6px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  box-shadow: 0 2px 5px rgba(5, 150, 105, 0.25) !important;
+  border: none !important;
+}
+
+#modal-admin-book-details .badge-danger,
+#modal-book-details .badge-danger {
+  background: #dc2626 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  padding: 4px 10px !important;
+  border-radius: 6px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  box-shadow: 0 2px 5px rgba(220, 38, 38, 0.25) !important;
+  border: none !important;
+}
+
+#modal-admin-book-details code.book-id-badge,
+#modal-admin-book-details code[style*="var(--accent-primary)"] {
+  background: #4B0028 !important;
+  color: #FFF9EB !important;
+  font-weight: 800 !important;
+  font-size: 12px !important;
+  padding: 3px 8px !important;
+  border-radius: 5px !important;
+  font-family: monospace !important;
+}
+
+#modal-admin-book-details code.isbn-badge,
+#modal-book-details code.isbn-badge,
+#modal-book-isbn {
+  background: #f0e3c5 !important;
+  color: #4B0028 !important;
+  font-weight: 800 !important;
+  font-family: monospace !important;
+  padding: 2px 7px !important;
+  border-radius: 4px !important;
+  border: 1px solid #dfd0ad !important;
+}
+
+/* Modal Footer */
+#modal-admin-book-details .modal-footer,
+#modal-book-details .modal-footer {
+  background: #FFF4D9 !important;
+  border-top: 1px solid #ebd9b8 !important;
+  padding: 12px 22px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 10px !important;
+  flex-shrink: 0 !important;
+}
+
+/* Action Buttons inside Book Details */
+#modal-admin-book-details .btn-secondary,
+#modal-book-details .btn-secondary {
+  background: #e9dec6 !important;
+  color: #292929 !important;
+  border: 1px solid #c9b996 !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  padding: 8px 16px !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+  transition: all 0.15s ease !important;
+}
+
+#modal-admin-book-details .btn-secondary:hover,
+#modal-book-details .btn-secondary:hover {
+  background: #ddceb0 !important;
+  border-color: #4B0028 !important;
+  color: #4B0028 !important;
+}
+
+#modal-admin-book-details .btn-primary,
+#modal-book-details .btn-primary {
+  background: #4B0028 !important;
+  color: #ffffff !important;
+  border: 1px solid #36001d !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  padding: 8px 18px !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  box-shadow: 0 3px 10px rgba(75, 0, 40, 0.3) !important;
+  transition: all 0.15s ease !important;
+}
+
+#modal-admin-book-details .btn-primary:hover,
+#modal-book-details .btn-primary:hover {
+  background: #36001d !important;
+  box-shadow: 0 4px 14px rgba(75, 0, 40, 0.45) !important;
+  transform: translateY(-1px) !important;
+}
+
+#modal-admin-book-details .btn-primary:disabled,
+#modal-book-details .btn-primary:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Global Dark Theme override for Book Details Modal to preserve visibility */
+[data-theme="dark"] #modal-admin-book-details .modal-box,
+[data-theme="dark"] #modal-admin-book-details .modal-card,
+[data-theme="dark"] #modal-book-details .modal-card,
+[data-theme="dark"] #modal-admin-book-details .book-details-modal-card,
+[data-theme="dark"] #modal-book-details .book-details-modal-card {
+  background: #FFF9EB !important;
+  color: #292929 !important;
+}
+[data-theme="dark"] #modal-admin-book-details .modal-header,
+[data-theme="dark"] #modal-book-details .modal-header,
+[data-theme="dark"] #modal-admin-book-details .modal-body,
+[data-theme="dark"] #modal-book-details .modal-body {
+  background: #FFF9EB !important;
+  color: #292929 !important;
+}
+[data-theme="dark"] #modal-admin-book-details .modal-footer,
+[data-theme="dark"] #modal-book-details .modal-footer {
+  background: #FFF4D9 !important;
+}
+[data-theme="dark"] #modal-admin-book-details p,
+[data-theme="dark"] #modal-book-details p,
+[data-theme="dark"] #modal-admin-book-details span:not(.badge),
+[data-theme="dark"] #modal-book-details span:not(.badge),
+[data-theme="dark"] #modal-admin-book-details div,
+[data-theme="dark"] #modal-book-details div,
+[data-theme="dark"] #modal-admin-book-details strong,
+[data-theme="dark"] #modal-book-details strong {
+  color: #292929;
+}
+[data-theme="dark"] #modal-admin-book-details h2,
+[data-theme="dark"] #modal-book-details h2,
+[data-theme="dark"] #modal-book-title,
+[data-theme="dark"] #modal-admin-book-detail-title {
+  color: #4B0028 !important;
+}
+[data-theme="dark"] #modal-admin-book-details .btn-primary,
+[data-theme="dark"] #modal-book-details .btn-primary {
+  color: #ffffff !important;
+  background: #4B0028 !important;
+}
+[data-theme="dark"] #modal-admin-book-details .btn-secondary,
+[data-theme="dark"] #modal-book-details .btn-secondary {
+  color: #292929 !important;
+  background: #e9dec6 !important;
+  border-color: #c9b996 !important;
+}

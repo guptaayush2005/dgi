@@ -3676,40 +3676,40 @@ class DGIApp {
     if (titleEl) titleEl.textContent = title;
     if (bodyEl) {
       bodyEl.innerHTML = `
-        <div style="display:flex; gap:20px; align-items:flex-start; margin-bottom:20px; flex-wrap:wrap;">
-          <div style="width:90px; height:120px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:42px; box-shadow:0 6px 16px rgba(0,0,0,0.25); background: linear-gradient(135deg, ${this.safeBookColor(b.color1)}, ${this.safeBookColor(b.color2)});">
+        <div style="display:flex; gap:18px; align-items:flex-start; margin-bottom:14px; flex-wrap:wrap;">
+          <div style="width:84px; height:110px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:38px; box-shadow:0 6px 14px rgba(0,0,0,0.22); background: linear-gradient(135deg, ${this.safeBookColor(b.color1)}, ${this.safeBookColor(b.color2)}); color:#ffc500; border:1px solid #d8caa7; flex-shrink:0;">
             📖
           </div>
           <div style="flex:1; min-width:220px;">
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap;">
-              <code style="font-size:13px; font-weight:800; color:var(--accent-primary); background:rgba(81,0,39,0.08); padding:3px 8px; border-radius:4px;">${this.escapeHTML(b.book_id || b.id)}</code>
+              <code class="book-id-badge" style="font-size:12px; font-weight:800; color:#FFF9EB; background:#4B0028; padding:3px 8px; border-radius:4px; font-family:monospace;">${this.escapeHTML(b.book_id || b.id)}</code>
               ${isAvail ? `<span class="badge badge-success">Available (${available} left)</span>` : `<span class="badge badge-danger">Out of Stock</span>`}
             </div>
-            <h2 style="margin:0 0 6px; font-size:18px; font-weight:800; color:var(--text-primary);">${this.escapeHTML(title)}</h2>
-            <div style="font-size:13px; color:var(--text-secondary); margin-bottom:4px;">by <strong>${this.escapeHTML(b.author || "Unknown")}</strong></div>
-            <div style="font-size:12px; color:var(--text-muted);">Subject: <strong>${this.escapeHTML(subject ? subject.subject_name : (b.category || "General"))}</strong> ${subject?.subject_code ? `(${this.escapeHTML(subject.subject_code)})` : ""}</div>
+            <h2 class="book-details-title" style="margin:0 0 5px; font-size:19px; font-weight:800; color:#4B0028; line-height:1.3;">${this.escapeHTML(title)}</h2>
+            <div style="font-size:13px; color:#292929; margin-bottom:4px;">by <strong style="color:#292929;">${this.escapeHTML(b.author || "Unknown")}</strong></div>
+            <div style="font-size:12px; color:#555555;">Subject: <strong style="color:#4B0028;">${this.escapeHTML(subject ? subject.subject_name : (b.category || "General"))}</strong> ${subject?.subject_code ? `<span style="color:#555555;">(${this.escapeHTML(subject.subject_code)})</span>` : ""}</div>
           </div>
         </div>
 
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; background:rgba(0,0,0,0.1); padding:14px; border-radius:8px; margin-bottom:18px; font-size:13px;">
-          <div><span style="color:var(--text-muted);">ISBN:</span> <code>${this.escapeHTML(b.isbn || "—")}</code></div>
-          <div><span style="color:var(--text-muted);">Category:</span> <strong>${this.escapeHTML(b.category || "General")}</strong></div>
-          <div><span style="color:var(--text-muted);">Publisher:</span> ${this.escapeHTML(b.publisher || "—")}</div>
-          <div><span style="color:var(--text-muted);">Year:</span> ${this.escapeHTML(year)}</div>
-          <div><span style="color:var(--text-muted);">Total Inventory:</span> <strong>${total} copies</strong></div>
-          <div><span style="color:var(--text-muted);">Currently Available:</span> <strong style="color:${isAvail ? 'var(--success)' : 'var(--danger)'};">${available} copies</strong></div>
+        <div class="book-details-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; background:#FFFFFF; padding:12px 16px; border-radius:10px; border:1px solid #ebd9b8; margin-bottom:12px; font-size:13px; box-shadow:0 2px 6px rgba(0,0,0,0.04);">
+          <div><span class="spec-label" style="color:#555555; font-weight:600;">ISBN:</span> <code class="isbn-badge" style="font-weight:700; color:#4B0028; background:#f0e3c5; padding:2px 6px; border-radius:4px; border:1px solid #dfd0ad;">${this.escapeHTML(b.isbn || "—")}</code></div>
+          <div><span class="spec-label" style="color:#555555; font-weight:600;">Category:</span> <strong style="color:#292929;">${this.escapeHTML(b.category || "General")}</strong></div>
+          <div><span class="spec-label" style="color:#555555; font-weight:600;">Publisher:</span> <strong style="color:#292929;">${this.escapeHTML(b.publisher || "—")}</strong></div>
+          <div><span class="spec-label" style="color:#555555; font-weight:600;">Year:</span> <strong style="color:#292929;">${this.escapeHTML(year)}</strong></div>
+          <div><span class="spec-label" style="color:#555555; font-weight:600;">Total Inventory:</span> <strong style="color:#292929;">${total} copies</strong></div>
+          <div><span class="spec-label" style="color:#555555; font-weight:600;">Currently Available:</span> <strong style="color:${isAvail ? '#059669' : '#dc2626'}; font-size:14px; font-weight:800;">${available} copies</strong></div>
         </div>
 
-        <div style="margin-bottom:14px;">
-          <div style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px;">Description</div>
-          <div style="font-size:13px; color:var(--text-secondary); line-height:1.5;">${this.escapeHTML(b.description || "Comprehensive academic reference book from library collections.")}</div>
+        <div style="margin-bottom:10px;">
+          <div style="font-size:11px; font-weight:800; color:#4B0028; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Description</div>
+          <div style="font-size:13px; color:#292929; line-height:1.5;">${this.escapeHTML(b.description || "Comprehensive academic reference book from library collections.")}</div>
         </div>
 
         ${accessions.length ? `
-          <div style="margin-top:14px;">
-            <div style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:6px;">Accession Numbers (${accessions.length})</div>
-            <div style="max-height:80px; overflow:auto; display:flex; gap:6px; flex-wrap:wrap;">
-              ${accessions.map(a => `<code style="font-size:11px; padding:2px 6px; background:rgba(0,0,0,0.2); border-radius:3px;">${this.escapeHTML(a)}</code>`).join("")}
+          <div style="margin-top:8px; margin-bottom:2px;">
+            <div style="font-size:11px; font-weight:800; color:#4B0028; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Accession Numbers (${accessions.length})</div>
+            <div style="max-height:65px; overflow:auto; display:flex; gap:6px; flex-wrap:wrap; padding:6px; background:#FFFFFF; border:1px solid #ebd9b8; border-radius:6px;">
+              ${accessions.map(a => `<code style="font-size:11px; font-weight:700; padding:2px 6px; background:#f0e3c5; color:#4B0028; border:1px solid #dfd0ad; border-radius:3px;">${this.escapeHTML(a)}</code>`).join("")}
             </div>
           </div>
         ` : ""}
@@ -3718,9 +3718,9 @@ class DGIApp {
 
     if (footerEl) {
       footerEl.innerHTML = `
-        <button class="btn btn-secondary btn-sm" onclick="window.app.closeModal('modal-admin-book-details')">Close</button>
-        <button class="btn btn-secondary btn-sm" onclick="window.app.closeModal('modal-admin-book-details'); window.app.openEditBookModal('${this.escapeHTML(b.book_id || b.id)}')">✏️ Edit Book</button>
-        <button class="btn btn-primary btn-sm" ${available === 0 ? 'disabled style="opacity:0.5;"' : ''} onclick="window.app.closeModal('modal-admin-book-details'); window.app.quickIssueBook('${this.escapeHTML(b.book_id || b.id)}')">Issue Book</button>
+        <button class="btn btn-secondary" onclick="window.app.closeModal('modal-admin-book-details')">Close</button>
+        <button class="btn btn-secondary" onclick="window.app.closeModal('modal-admin-book-details'); window.app.openEditBookModal('${this.escapeHTML(b.book_id || b.id)}')">✏️ Edit Book</button>
+        <button class="btn btn-primary" ${available === 0 ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''} onclick="window.app.closeModal('modal-admin-book-details'); window.app.quickIssueBook('${this.escapeHTML(b.book_id || b.id)}')">Issue Book</button>
       `;
     }
 
