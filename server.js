@@ -338,18 +338,7 @@ function ensureDatabaseIntegrity(state) {
 
 function defaultLibraryState() {
   const subjects = defaultSubjects();
-  const books = [
-    { id: "DGI-BK-000001", book_id: "DGI-BK-000001", title: "Data Structures & Algorithms in C++", book_name: "Data Structures & Algorithms in C++", author: "Mark Allen Weiss", subject_id: "SUB-0002", isbn: "978-0132847377", publisher: "Pearson", publication_year: 2013, category: "Programming & Software Development", shelf_location: "Stack CS-101", total_copies: 5, available_copies: 3, quantity: 5, available: 3 },
-    { id: "DGI-BK-000002", book_id: "DGI-BK-000002", title: "Database System Concepts", book_name: "Database System Concepts", author: "Silberschatz, Korth, Sudarshan", subject_id: "SUB-0003", isbn: "978-0078022159", publisher: "McGraw-Hill", publication_year: 2019, category: "Databases & Information Systems", shelf_location: "Stack CS-102", total_copies: 6, available_copies: 1, quantity: 6, available: 1 },
-    { id: "DGI-BK-000003", book_id: "DGI-BK-000003", title: "Operating System Concepts", book_name: "Operating System Concepts", author: "Abraham Silberschatz, Peter B. Galvin", subject_id: "SUB-0005", isbn: "978-1118063330", publisher: "Wiley", publication_year: 2018, category: "Operating Systems", shelf_location: "Stack CS-103", total_copies: 4, available_copies: 2, quantity: 4, available: 2 },
-    { id: "DGI-BK-000004", book_id: "DGI-BK-000004", title: "Computer Networks", book_name: "Computer Networks", author: "Andrew S. Tanenbaum", subject_id: "SUB-0006", isbn: "978-0132126953", publisher: "Pearson", publication_year: 2020, category: "Computer Networks", shelf_location: "Stack CS-104", total_copies: 5, available_copies: 4, quantity: 5, available: 4 },
-    { id: "DGI-BK-000005", book_id: "DGI-BK-000005", title: "Artificial Intelligence: A Modern Approach", book_name: "Artificial Intelligence: A Modern Approach", author: "Stuart Russell, Peter Norvig", subject_id: "SUB-0004", isbn: "978-0136042594", publisher: "Pearson", publication_year: 2021, category: "Artificial Intelligence & Data Science", shelf_location: "Stack CS-105", total_copies: 3, available_copies: 1, quantity: 3, available: 1 },
-    { id: "DGI-BK-000006", book_id: "DGI-BK-000006", title: "Web Technologies: HTML, CSS, JavaScript & PHP", book_name: "Web Technologies: HTML, CSS, JavaScript & PHP", author: "Uttam K. Roy", subject_id: "SUB-0002", isbn: "978-0198066224", publisher: "Oxford", publication_year: 2018, category: "Programming & Software Development", shelf_location: "Stack CS-106", total_copies: 4, available_copies: 3, quantity: 4, available: 3 },
-    { id: "DGI-BK-000007", book_id: "DGI-BK-000007", title: "Theory of Computer Science: Automata, Languages", book_name: "Theory of Computer Science: Automata, Languages", author: "K.L.P. Mishra, N. Chandrasekaran", subject_id: "SUB-0001", isbn: "978-8120329683", publisher: "PHI Learning", publication_year: 2014, category: "Computer Science Fundamentals", shelf_location: "Stack CS-107", total_copies: 4, available_copies: 2, quantity: 4, available: 2 },
-    { id: "DGI-BK-000008", book_id: "DGI-BK-000008", title: "Software Engineering: A Practitioner's Approach", book_name: "Software Engineering: A Practitioner's Approach", author: "Roger S. Pressman", subject_id: "SUB-0008", isbn: "978-0078022128", publisher: "McGraw-Hill", publication_year: 2019, category: "Software Engineering & Architecture", shelf_location: "Stack CS-108", total_copies: 5, available_copies: 0, quantity: 5, available: 0 },
-    { id: "DGI-BK-000009", book_id: "DGI-BK-000009", title: "Electronic Devices and Circuit Theory", book_name: "Electronic Devices and Circuit Theory", author: "Robert L. Boylestad, Louis Nashelsky", subject_id: "SUB-0009", isbn: "978-0137692828", publisher: "Pearson", publication_year: 2015, category: "Electronics & Communication", shelf_location: "Stack EC-201", total_copies: 3, available_copies: 1, quantity: 3, available: 1 },
-    { id: "DGI-BK-000010", book_id: "DGI-BK-000010", title: "Engineering Mechanics: Statics and Dynamics", book_name: "Engineering Mechanics: Statics and Dynamics", author: "S. Timoshenko, D.H. Young", subject_id: "SUB-0010", isbn: "978-0070616806", publisher: "McGraw-Hill", publication_year: 2017, category: "Mechanical Engineering", shelf_location: "Stack ME-301", total_copies: 5, available_copies: 4, quantity: 5, available: 4 }
-  ];
+  const books = [];
   const students = [
     { id: "DGI-STU-000001", student_id: "DGI-STU-000001", name: "Ayush Gupta", roll_no: "CS101", department: "CSIT", email: "ayush.csit@dronacharya.info", phone: "+91 98765 43210" },
     { id: "DGI-STU-000002", student_id: "DGI-STU-000002", name: "Priya Sharma", roll_no: "CS102", department: "CSIT", email: "priya.csit@dronacharya.info", phone: "+91 98765 43211" },
@@ -357,12 +346,7 @@ function defaultLibraryState() {
     { id: "DGI-STU-000004", student_id: "DGI-STU-000004", name: "Ananya Singh", roll_no: "CS104", department: "CSIT", email: "ananya.csit@dronacharya.info", phone: "+91 98765 43213" },
     { id: "DGI-STU-000005", student_id: "DGI-STU-000005", name: "Amit Kumar", roll_no: "ME101", department: "Mechanical", email: "amit.me@dronacharya.info", phone: "+91 98765 43214" }
   ];
-  const transactions = [
-    { id: "DGI-ISS-000001", issue_id: "DGI-ISS-000001", student_id: "DGI-STU-000001", book_id: "DGI-BK-000002", book_title: "Database System Concepts", book_isbn: "978-0078022159", issue_date: "2026-11-05", due_date: "2026-11-19", return_date: null, status: "issued", fine: 0, reissue_count: 0 },
-    { id: "DGI-ISS-000002", issue_id: "DGI-ISS-000002", return_id: "DGI-RET-000001", student_id: "DGI-STU-000001", book_id: "DGI-BK-000001", book_title: "Data Structures & Algorithms in C++", book_isbn: "978-0132847377", issue_date: "2026-10-10", due_date: "2026-10-24", return_date: "2026-10-22", status: "returned", fine: 0, reissue_count: 0 },
-    { id: "DGI-ISS-000003", issue_id: "DGI-ISS-000003", return_id: "DGI-RET-000002", student_id: "DGI-STU-000001", book_id: "DGI-BK-000003", book_title: "Operating System Concepts", book_isbn: "978-1118063330", issue_date: "2026-09-01", due_date: "2026-09-15", return_date: "2026-09-14", status: "returned", fine: 0, reissue_count: 0 },
-    { id: "DGI-ISS-000004", issue_id: "DGI-ISS-000004", student_id: "DGI-STU-000002", book_id: "DGI-BK-000008", book_title: "Software Engineering: A Practitioner's Approach", book_isbn: "978-0078022128", issue_date: "2026-11-01", due_date: "2026-11-15", return_date: null, status: "issued", fine: 10, reissue_count: 1 }
-  ];
+  const transactions = [];
   return {
     subjects,
     books,
@@ -374,15 +358,13 @@ function defaultLibraryState() {
     book_requests: [],
     sequences: {
       subject: 11,
-      book: 10,
+      book: 0,
       student: 5,
       faculty: 0,
-      issue: 4,
-      return: 2,
+      issue: 0,
+      return: 0,
       request: 0
     },
-    alert_logs: [],
-    book_requests: [],
     settings: {
       library_name: "DGI Central Library",
       institution_name: "Dronacharya Group of Institutions, Greater Noida",
@@ -1017,7 +999,7 @@ async function handleRequest(req, res) {
       const state = (rawState && typeof rawState === 'object') ? rawState : defaultState;
       ensureDatabaseIntegrity(state);
 
-      const books = (Array.isArray(state.books) && state.books.length > 0) ? state.books : defaultState.books;
+      const books = Array.isArray(state.books) ? state.books : [];
       const publicBooks = books.map(b => {
         const sub = (state.subjects || []).find(s => matchId(s.subject_id, b.subject_id)) || {};
         return {
@@ -1056,7 +1038,7 @@ async function handleRequest(req, res) {
       ensureDatabaseIntegrity(state);
 
       const students = (Array.isArray(state.students) && state.students.length > 0) ? state.students : defaultState.students;
-      const transactions = (Array.isArray(state.transactions) && state.transactions.length > 0) ? state.transactions : defaultState.transactions;
+      const transactions = Array.isArray(state.transactions) ? state.transactions : [];
 
       const student = students.find(s => String(s.roll_no || '').trim().toLowerCase() === rollNo);
       if (!student) {
