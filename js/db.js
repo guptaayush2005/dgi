@@ -275,13 +275,95 @@ class LibraryDatabase {
     localStorage.setItem(importKey, "complete");
   }
 
+  matchId(a, b) {
+    if (a === undefined || a === null || b === undefined || b === null) return false;
+    const strA = String(a).trim().toLowerCase();
+    const strB = String(b).trim().toLowerCase();
+    if (strA === strB) return true;
+    const numA = parseInt(strA.replace(/\D/g, ''), 10);
+    const numB = parseInt(strB.replace(/\D/g, ''), 10);
+    if (!isNaN(numA) && !isNaN(numB) && numA === numB && numA > 0) return true;
+    return false;
+  }
+
+  nextSequence(entity) {
+    const data = this._getData();
+    data.sequences = data.sequences || {};
+    let current = Number(data.sequences[entity]) || 0;
+    if (current === 0) {
+      if (entity === 'subject' && Array.isArray(data.subjects)) {
+        current = data.subjects.reduce((max, s) => Math.max(max, parseInt(String(s.subject_id).replace(/\D/g, ''), 10) || 0), 0);
+      } else if (entity === 'book' && Array.isArray(data.books)) {
+        current = data.books.reduce((max, b) => Math.max(max, parseInt(String(b.book_id || b.id).replace(/\D/g, ''), 10) || 0), 0);
+      } else if (entity === 'student' && Array.isArray(data.students)) {
+        current = data.students.reduce((max, s) => Math.max(max, parseInt(String(s.student_id || s.id).replace(/\D/g, ''), 10) || 0), 0);
+      } else if (entity === 'faculty' && Array.isArray(data.faculty)) {
+        current = data.faculty.reduce((max, f) => Math.max(max, parseInt(String(f.faculty_id || f.id).replace(/\D/g, ''), 10) || 0), 0);
+      } else if (entity === 'issue' && Array.isArray(data.transactions)) {
+        current = data.transactions.reduce((max, t) => Math.max(max, parseInt(String(t.issue_id || t.id).replace(/\D/g, ''), 10) || 0), 0);
+      } else if (entity === 'return' && Array.isArray(data.transactions)) {
+        current = data.transactions.reduce((max, t) => Math.max(max, parseInt(String(t.return_id).replace(/\D/g, ''), 10) || 0), 0);
+      } else if (entity === 'request' && Array.isArray(data.book_requests)) {
+        current = data.book_requests.reduce((max, r) => Math.max(max, parseInt(String(r.request_id || r.id).replace(/\D/g, ''), 10) || 0), 0);
+      }
+    }
+    current += 1;
+    data.sequences[entity] = current;
+    return current;
+  }
+
+  generateId(entity) {
+    const seq = this.nextSequence(entity);
+    switch (entity) {
+      case 'subject':
+        return `SUB-${String(seq).padStart(4, '0')}`;
+      case 'book':
+        return `DGI-BK-${String(seq).padStart(6, '0')}`;
+      case 'student':
+        return `DGI-STU-${String(seq).padStart(6, '0')}`;
+      case 'faculty':
+        return `DGI-FAC-${String(seq).padStart(6, '0')}`;
+      case 'issue':
+        return `DGI-ISS-${String(seq).padStart(6, '0')}`;
+      case 'return':
+        return `DGI-RET-${String(seq).padStart(6, '0')}`;
+      case 'request':
+        return `DGI-REQ-${String(seq).padStart(6, '0')}`;
+      default:
+        return `${entity.toUpperCase()}-${String(seq).padStart(6, '0')}`;
+    }
+  }
+
   seedInitialData() {
     return {
+      subjects: [
+        { subject_id: "SUB-0001", subject_name: "Computer Science Fundamentals", subject_code: "CS-101", description: "Core computer science principles, discrete structures, and theoretical computation.", icon: "💻" },
+        { subject_id: "SUB-0002", subject_name: "Programming & Software Development", subject_code: "CS-102", description: "Object-oriented programming, C++, Java, Python, and data structures.", icon: "⚡" },
+        { subject_id: "SUB-0003", subject_name: "Databases & Information Systems", subject_code: "CS-103", description: "Relational database management, SQL, query processing, and data architecture.", icon: "🗄️" },
+        { subject_id: "SUB-0004", subject_name: "Artificial Intelligence & Data Science", subject_code: "CS-104", description: "Machine learning algorithms, neural networks, computer vision, and modern AI.", icon: "🤖" },
+        { subject_id: "SUB-0005", subject_name: "Operating Systems", subject_code: "CS-105", description: "Kernel architecture, process synchronization, memory management, and file systems.", icon: "⚙️" },
+        { subject_id: "SUB-0006", subject_name: "Computer Networks", subject_code: "CS-106", description: "Network layers, protocols, TCP/IP, wireless routing, and data communication.", icon: "🌐" },
+        { subject_id: "SUB-0007", subject_name: "Cyber Security & Cloud", subject_code: "CS-107", description: "Network security, cryptography, cloud computing infrastructure, and virtualization.", icon: "🔒" },
+        { subject_id: "SUB-0008", subject_name: "Software Engineering & Architecture", subject_code: "CS-108", description: "Software engineering methodologies, system design patterns, and clean code principles.", icon: "📐" },
+        { subject_id: "SUB-0009", subject_name: "Electronics & Communication", subject_code: "EC-201", description: "Semiconductor physics, analog and digital electronics, and circuit theory.", icon: "📡" },
+        { subject_id: "SUB-0010", subject_name: "Mechanical Engineering", subject_code: "ME-301", description: "Engineering mechanics, statics, dynamics, thermodynamics, and manufacturing.", icon: "🔧" },
+        { subject_id: "SUB-0011", subject_name: "Mathematics & Applied Sciences", subject_code: "AS-101", description: "Engineering mathematics, calculus, linear algebra, and numerical techniques.", icon: "📊" }
+      ],
       books: [],
       students: [],
       faculty: [],
       transactions: [],
       alert_logs: [],
+      book_requests: [],
+      sequences: {
+        subject: 11,
+        book: 0,
+        student: 0,
+        faculty: 0,
+        issue: 0,
+        return: 0,
+        request: 0
+      },
       settings: {
         library_name: "DGI Central Library",
         institution_name: "Dronacharya Group of Institutions, Greater Noida",
@@ -303,26 +385,14 @@ class LibraryDatabase {
   getSubjects() {
     const data = this._getData();
     if (!Array.isArray(data.subjects) || data.subjects.length === 0) {
-      data.subjects = [
-        { subject_id: 1, subject_name: "Computer Science Fundamentals", subject_code: "CS-101", description: "Core computer science principles, discrete structures, and theoretical computation.", icon: "💻" },
-        { subject_id: 2, subject_name: "Programming & Software Development", subject_code: "CS-102", description: "Object-oriented programming, C++, Java, Python, and data structures.", icon: "⚡" },
-        { subject_id: 3, subject_name: "Databases & Information Systems", subject_code: "CS-103", description: "Relational database management, SQL, query processing, and data architecture.", icon: "🗄️" },
-        { subject_id: 4, subject_name: "Artificial Intelligence & Data Science", subject_code: "CS-104", description: "Machine learning algorithms, neural networks, computer vision, and modern AI.", icon: "🤖" },
-        { subject_id: 5, subject_name: "Operating Systems", subject_code: "CS-105", description: "Kernel architecture, process synchronization, memory management, and file systems.", icon: "⚙️" },
-        { subject_id: 6, subject_name: "Computer Networks", subject_code: "CS-106", description: "Network layers, protocols, TCP/IP, wireless routing, and data communication.", icon: "🌐" },
-        { subject_id: 7, subject_name: "Cyber Security & Cloud", subject_code: "CS-107", description: "Network security, cryptography, cloud computing infrastructure, and virtualization.", icon: "🔒" },
-        { subject_id: 8, subject_name: "Software Engineering & Architecture", subject_code: "CS-108", description: "Software engineering methodologies, system design patterns, and clean code principles.", icon: "📐" },
-        { subject_id: 9, subject_name: "Electronics & Communication", subject_code: "EC-201", description: "Semiconductor physics, analog and digital electronics, and circuit theory.", icon: "📡" },
-        { subject_id: 10, subject_name: "Mechanical Engineering", subject_code: "ME-301", description: "Engineering mechanics, statics, dynamics, thermodynamics, and manufacturing.", icon: "🔧" },
-        { subject_id: 11, subject_name: "Mathematics & Applied Sciences", subject_code: "AS-101", description: "Engineering mathematics, calculus, linear algebra, and numerical techniques.", icon: "📊" }
-      ];
+      data.subjects = this.seedInitialData().subjects;
       this._saveData(data);
     }
     return data.subjects;
   }
 
   getSubjectById(id) {
-    return this.getSubjects().find(s => Number(s.subject_id) === Number(id));
+    return this.getSubjects().find(s => this.matchId(s.subject_id, id));
   }
 
   addSubject(subjectData) {
@@ -337,11 +407,11 @@ class LibraryDatabase {
       throw new Error(`A subject with this name (${dup.subject_name}) or code (${dup.subject_code}) already exists.`);
     }
 
-    const nextId = data.subjects.reduce((max, s) => Math.max(max, Number(s.subject_id) || 0), 0) + 1;
+    const nextId = this.generateId('subject');
     const newSubject = {
       subject_id: nextId,
       subject_name: name,
-      subject_code: code,
+      subject_code: code || `SUB-${nextId.replace(/\D/g, '')}`,
       description: String(subjectData.description || "").trim(),
       icon: String(subjectData.icon || "📖").trim(),
       created_at: new Date().toISOString()
@@ -354,14 +424,14 @@ class LibraryDatabase {
   updateSubject(id, subjectData) {
     const data = this._getData();
     data.subjects = this.getSubjects();
-    const idx = data.subjects.findIndex(s => Number(s.subject_id) === Number(id));
+    const idx = data.subjects.findIndex(s => this.matchId(s.subject_id, id));
     if (idx === -1) throw new Error("Subject not found.");
 
     const name = String(subjectData.subject_name || subjectData.name || "").trim();
     const code = String(subjectData.subject_code || subjectData.code || "").trim();
     if (!name) throw new Error("Enter the subject name.");
 
-    const dup = data.subjects.find(s => Number(s.subject_id) !== Number(id) && (s.subject_name.toLowerCase() === name.toLowerCase() || (code && s.subject_code && s.subject_code.toLowerCase() === code.toLowerCase())));
+    const dup = data.subjects.find(s => !this.matchId(s.subject_id, id) && (s.subject_name.toLowerCase() === name.toLowerCase() || (code && s.subject_code && s.subject_code.toLowerCase() === code.toLowerCase())));
     if (dup) throw new Error("Another subject with this name or code already exists.");
 
     const oldName = data.subjects[idx].subject_name;
@@ -375,7 +445,7 @@ class LibraryDatabase {
 
     // Update categories on books belonging to this subject
     (data.books || []).forEach(b => {
-      if (Number(b.subject_id) === Number(id) && (!b.category || b.category === oldName)) {
+      if (this.matchId(b.subject_id, id) && (!b.category || b.category === oldName)) {
         b.category = name;
       }
     });
@@ -387,20 +457,20 @@ class LibraryDatabase {
   deleteSubject(id, reassignSubjectId = null) {
     const data = this._getData();
     data.subjects = this.getSubjects();
-    const idx = data.subjects.findIndex(s => Number(s.subject_id) === Number(id));
+    const idx = data.subjects.findIndex(s => this.matchId(s.subject_id, id));
     if (idx === -1) throw new Error("Subject not found.");
 
-    const dependentBooks = (data.books || []).filter(b => Number(b.subject_id) === Number(id));
+    const dependentBooks = (data.books || []).filter(b => this.matchId(b.subject_id, id));
     if (dependentBooks.length > 0) {
       if (!reassignSubjectId) {
         throw new Error(`Cannot delete subject because ${dependentBooks.length} book(s) belong to it. Reassign or delete the books first.`);
       }
-      const targetSub = data.subjects.find(s => Number(s.subject_id) === Number(reassignSubjectId));
-      if (!targetSub || Number(targetSub.subject_id) === Number(id)) {
+      const targetSub = data.subjects.find(s => this.matchId(s.subject_id, reassignSubjectId));
+      if (!targetSub || this.matchId(targetSub.subject_id, id)) {
         throw new Error("Invalid reassignment target subject.");
       }
       dependentBooks.forEach(b => {
-        b.subject_id = Number(reassignSubjectId);
+        b.subject_id = targetSub.subject_id;
         b.category = targetSub.subject_name;
       });
     }
@@ -411,7 +481,7 @@ class LibraryDatabase {
   }
 
   getBooksBySubjectId(subjectId) {
-    return this.getBooks().filter(b => Number(b.subject_id) === Number(subjectId));
+    return this.getBooks().filter(b => this.matchId(b.subject_id, subjectId));
   }
 
   // --- Books CRUD ---
@@ -420,24 +490,24 @@ class LibraryDatabase {
   }
 
   getBookById(id) {
-    return this.getBooks().find(b => Number(b.id) === Number(id) || Number(b.book_id) === Number(id));
+    return this.getBooks().find(b => this.matchId(b.id, id) || this.matchId(b.book_id, id));
   }
 
   addBook(bookData) {
     const data = this._getData();
-    const newId = data.books.length > 0 ? Math.max(...data.books.map(b => Number(b.id) || Number(b.book_id) || 0)) + 1 : 1;
+    const newId = this.generateId('book');
     const qty = parseInt(bookData.quantity || bookData.total_copies) || 1;
 
-    let subjectId = Number(bookData.subject_id);
+    let subjectId = bookData.subject_id;
     let subjects = this.getSubjects();
-    let sub = subjects.find(s => Number(s.subject_id) === subjectId);
+    let sub = subjects.find(s => this.matchId(s.subject_id, subjectId));
     if (!sub && bookData.category) {
       sub = subjects.find(s => s.subject_name.toLowerCase() === String(bookData.category).trim().toLowerCase());
       if (sub) subjectId = sub.subject_id;
     }
     if (!sub) {
       sub = subjects[0];
-      subjectId = sub ? sub.subject_id : 1;
+      subjectId = sub ? sub.subject_id : "SUB-0001";
     }
 
     // Pick vibrant gradient pair
@@ -461,7 +531,7 @@ class LibraryDatabase {
       book_name: title,
       author: (bookData.author || "Unknown Author").trim(),
       publisher: String(bookData.publisher || "DGI Academic Press").trim(),
-      isbn: String(bookData.isbn || "").trim() || `978-DGI-${String(newId).padStart(4, '0')}`,
+      isbn: String(bookData.isbn || "").trim() || `978-DGI-${String(newId.replace(/\D/g, '')).padStart(4, '0')}`,
       subject_id: subjectId,
       category: sub ? sub.subject_name : (bookData.category || "General"),
       quantity: qty,
@@ -707,7 +777,7 @@ class LibraryDatabase {
 
   updateBook(id, updateData) {
     const data = this._getData();
-    const idx = data.books.findIndex(b => Number(b.id) === Number(id) || Number(b.book_id) === Number(id));
+    const idx = data.books.findIndex(b => this.matchId(b.id, id) || this.matchId(b.book_id, id));
     if (idx === -1) return null;
 
     const old = data.books[idx];
@@ -716,7 +786,7 @@ class LibraryDatabase {
     const qtyDiff = newQty - oldQty;
     const newAvailable = Math.max(0, (old.available_copies ?? old.available ?? 1) + qtyDiff);
 
-    let subjectId = updateData.subject_id !== undefined ? Number(updateData.subject_id) : (old.subject_id || 1);
+    let subjectId = updateData.subject_id !== undefined ? updateData.subject_id : (old.subject_id || "SUB-0001");
     let sub = this.getSubjectById(subjectId);
     let category = sub ? sub.subject_name : (updateData.category || old.category || "General");
 
@@ -729,7 +799,7 @@ class LibraryDatabase {
       book_id: old.book_id || old.id,
       title: title,
       book_name: title,
-      subject_id: subjectId,
+      subject_id: sub ? sub.subject_id : subjectId,
       category: category,
       total_copies: newQty,
       quantity: newQty,
@@ -748,11 +818,11 @@ class LibraryDatabase {
   deleteBook(id) {
     const data = this._getData();
     // Check if book currently issued
-    const isIssued = data.transactions.some(t => t.book_id === Number(id) && t.status === 'issued');
+    const isIssued = data.transactions.some(t => this.matchId(t.book_id, id) && t.status === 'issued');
     if (isIssued) {
       throw new Error("Cannot delete a book that is currently issued to students!");
     }
-    data.books = data.books.filter(b => b.id !== Number(id));
+    data.books = data.books.filter(b => !this.matchId(b.id, id) && !this.matchId(b.book_id, id));
     this._saveData(data);
     return true;
   }
@@ -763,11 +833,11 @@ class LibraryDatabase {
   }
 
   getStudentById(id) {
-    return this.getStudents().find(s => s.id === Number(id));
+    return this.getStudents().find(s => this.matchId(s.id, id) || this.matchId(s.student_id, id));
   }
 
   getStudentByRollNo(rollNo) {
-    return this.getStudents().find(s => s.roll_no.toLowerCase() === rollNo.trim().toLowerCase());
+    return this.getStudents().find(s => String(s.roll_no || '').toLowerCase() === String(rollNo || '').trim().toLowerCase());
   }
 
   findMatchingStudent(studentData) {
@@ -793,11 +863,12 @@ class LibraryDatabase {
       throw new Error("A student with this roll number, email, or phone number already exists.");
     }
 
-    const newId = data.students.length > 0 ? Math.max(...data.students.map(s => s.id)) + 1 : 1;
+    const newId = this.generateId('student');
     const initials = studentData.name.trim().split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase() || "ST";
 
     const newStudent = {
       id: newId,
+      student_id: newId,
       name: studentData.name.trim(),
       roll_no: studentData.roll_no.trim().toUpperCase(),
       email: studentData.email.trim(),
@@ -814,12 +885,12 @@ class LibraryDatabase {
 
   updateStudent(id, updateData) {
     const data = this._getData();
-    const idx = data.students.findIndex(s => s.id === Number(id));
+    const idx = data.students.findIndex(s => this.matchId(s.id, id) || this.matchId(s.student_id, id));
     if (idx === -1) return null;
 
     const updatedStudent = { ...data.students[idx], ...updateData };
     const duplicate = this.findMatchingStudent(updatedStudent);
-    if (duplicate && duplicate.id !== Number(id)) {
+    if (duplicate && !this.matchId(duplicate.id, id)) {
       throw new Error("Another student already uses this roll number, email, or phone number.");
     }
     data.students[idx] = updatedStudent;
@@ -829,11 +900,11 @@ class LibraryDatabase {
 
   deleteStudent(id) {
     const data = this._getData();
-    const hasLoans = data.transactions.some(t => t.student_id === Number(id) && t.status === 'issued');
+    const hasLoans = data.transactions.some(t => this.matchId(t.student_id, id) && t.status === 'issued');
     if (hasLoans) {
       throw new Error("Cannot delete a student who has active borrowed books!");
     }
-    data.students = data.students.filter(s => s.id !== Number(id));
+    data.students = data.students.filter(s => !this.matchId(s.id, id) && !this.matchId(s.student_id, id));
     this._saveData(data);
     return true;
   }
@@ -843,7 +914,7 @@ class LibraryDatabase {
   }
 
   getFacultyById(id) {
-    return this.getFaculty().find(member => Number(member.id) === Number(id));
+    return this.getFaculty().find(member => this.matchId(member.id, id) || this.matchId(member.faculty_id, id));
   }
 
   addFaculty(facultyData) {
@@ -859,8 +930,10 @@ class LibraryDatabase {
     this.validateFaculty(faculty);
     this.ensureUniqueFaculty(faculty);
 
+    const newId = this.generateId('faculty');
     const newFaculty = {
-      id: data.faculty.length ? Math.max(...data.faculty.map(member => Number(member.id) || 0)) + 1 : 1,
+      id: newId,
+      faculty_id: faculty.faculty_id || newId,
       ...faculty,
       created_at: new Date().toISOString()
     };
@@ -871,7 +944,7 @@ class LibraryDatabase {
 
   updateFaculty(id, facultyData) {
     const data = this._getData();
-    const index = data.faculty.findIndex(member => Number(member.id) === Number(id));
+    const index = data.faculty.findIndex(member => this.matchId(member.id, id) || this.matchId(member.faculty_id, id));
     if (index === -1) return null;
 
     const faculty = {
@@ -884,7 +957,7 @@ class LibraryDatabase {
       email: String(facultyData.email || "").trim()
     };
     this.validateFaculty(faculty);
-    this.ensureUniqueFaculty(faculty, Number(id));
+    this.ensureUniqueFaculty(faculty, id);
     data.faculty[index] = faculty;
     this._saveData(data);
     return faculty;
@@ -927,8 +1000,8 @@ class LibraryDatabase {
     const students = data.students;
 
     return (data.transactions || []).map(t => {
-      const book = books.find(b => b.id === t.book_id) || { title: t.book_title || "Unknown Book", isbn: t.book_isbn || "N/A" };
-      const student = students.find(s => s.id === t.student_id) || { name: "Unknown Student", roll_no: "N/A", phone: "", email: "" };
+      const book = books.find(b => this.matchId(b.id, t.book_id) || this.matchId(b.book_id, t.book_id)) || { title: t.book_title || "Unknown Book", isbn: t.book_isbn || "N/A" };
+      const student = students.find(s => this.matchId(s.id, t.student_id) || this.matchId(s.student_id, t.student_id)) || { name: "Unknown Student", roll_no: "N/A", phone: "", email: "" };
       
       // Calculate live fine if status is issued
       let currentFine = Number(t.fine) || 0;
@@ -952,29 +1025,30 @@ class LibraryDatabase {
         calculated_fine: currentFine,
         days_late: daysLate
       };
-    }).sort((a, b) => b.id - a.id);
+    }).sort((a, b) => String(b.id || '').localeCompare(String(a.id || '')));
   }
 
   getFacultyTransactions() {
     const data = this._getData();
     return (data.faculty_transactions || []).map(t => {
-      const book = data.books.find(b => Number(b.id) === Number(t.book_id)) || {};
-      const faculty = (data.faculty || []).find(f => Number(f.id) === Number(t.faculty_id)) || {};
+      const book = data.books.find(b => this.matchId(b.id, t.book_id) || this.matchId(b.book_id, t.book_id)) || {};
+      const faculty = (data.faculty || []).find(f => this.matchId(f.id, t.faculty_id) || this.matchId(f.faculty_id, t.faculty_id)) || {};
       const calc = t.status === 'issued' ? this.calculateFine(t.due_date) : { fine: 0, daysLate: 0 };
       return { ...t, borrower_type: 'faculty', book_title: t.book_title || book.title || 'Unknown Book', book_author: book.author || '', book_isbn: t.book_isbn || book.isbn || '', student_name: faculty.name || t.faculty_name || 'Unknown Faculty', student_roll: faculty.faculty_id || t.faculty_code || '—', student_phone: faculty.phone || '', student_email: faculty.email || '', calculated_fine: Math.round(((Number(t.fine) || 0) + calc.fine) * 100) / 100, days_late: calc.daysLate };
-    }).sort((a, b) => b.id - a.id);
+    }).sort((a, b) => String(b.id || '').localeCompare(String(a.id || '')));
   }
 
   issueFacultyBook(bookId, facultyId, dueDateStr, remarks = '', issueDateStr = null) {
     const data = this._getData();
-    const book = data.books.find(b => Number(b.id) === Number(bookId));
-    const faculty = (data.faculty || []).find(f => Number(f.id) === Number(facultyId));
-    if (!book || book.available <= 0) throw new Error('Selected book is unavailable.');
+    const book = data.books.find(b => this.matchId(b.id, bookId) || this.matchId(b.book_id, bookId));
+    const faculty = (data.faculty || []).find(f => this.matchId(f.id, facultyId) || this.matchId(f.faculty_id, facultyId));
+    if (!book || (book.available_copies ?? book.available ?? 0) <= 0) throw new Error('Selected book is unavailable.');
     if (!faculty) throw new Error('Select a registered faculty member.');
     data.faculty_transactions ||= [];
-    const id = data.faculty_transactions.length ? Math.max(...data.faculty_transactions.map(t => Number(t.id) || 0)) + 1 : 1;
-    const tx = { id, book_id: book.id, book_title: book.title, book_isbn: book.isbn, faculty_id: faculty.id, faculty_name: faculty.name, faculty_code: faculty.faculty_id || '', issue_date: issueDateStr || new Date().toISOString().slice(0, 10), due_date: dueDateStr, return_date: null, fine: 0, fine_status: 'none', status: 'issued', remarks: String(remarks || '').trim() };
-    book.available -= 1;
+    const id = this.generateId('issue');
+    const tx = { id, issue_id: id, book_id: book.book_id || book.id, book_title: book.title, book_isbn: book.isbn, faculty_id: faculty.faculty_id || faculty.id, faculty_name: faculty.name, faculty_code: faculty.faculty_id || '', issue_date: issueDateStr || new Date().toISOString().slice(0, 10), due_date: dueDateStr, return_date: null, fine: 0, fine_status: 'none', status: 'issued', remarks: String(remarks || '').trim() };
+    book.available = Math.max(0, (book.available_copies ?? book.available ?? 1) - 1);
+    book.available_copies = book.available;
     book.borrow_count = (book.borrow_count || 0) + 1;
     data.faculty_transactions.push(tx);
     this._saveData(data);
@@ -983,28 +1057,36 @@ class LibraryDatabase {
 
   returnFacultyBook(transactionId, fineAction = 'none', fineAmount = 0, remarks = '', paymentMethod = '') {
     const data = this._getData();
-    const tx = (data.faculty_transactions || []).find(t => Number(t.id) === Number(transactionId));
+    const tx = (data.faculty_transactions || []).find(t => this.matchId(t.id, transactionId) || this.matchId(t.issue_id, transactionId));
     if (!tx || tx.status === 'returned') throw new Error('Faculty loan not found or already returned.');
-    const book = data.books.find(b => Number(b.id) === Number(tx.book_id));
-    tx.status = 'returned'; tx.return_date = new Date().toISOString().slice(0, 10); tx.fine = Number(fineAmount) || 0; tx.fine_status = fineAction; tx.payment_method = fineAction === 'paid' ? paymentMethod : '';
+    const book = data.books.find(b => this.matchId(b.id, tx.book_id) || this.matchId(b.book_id, tx.book_id));
+    tx.status = 'returned';
+    tx.return_date = new Date().toISOString().slice(0, 10);
+    tx.return_id = this.generateId('return');
+    tx.fine = Number(fineAmount) || 0;
+    tx.fine_status = fineAction;
+    tx.payment_method = fineAction === 'paid' ? paymentMethod : '';
     if (remarks) tx.remarks = [tx.remarks, remarks].filter(Boolean).join(' | ');
-    if (book) book.available = Math.min(book.quantity, book.available + 1);
+    if (book) {
+      book.available = Math.min(book.total_copies ?? book.quantity, (book.available_copies ?? book.available ?? 0) + 1);
+      book.available_copies = book.available;
+    }
     this._saveData(data);
     return tx;
   }
 
   issueBook(bookId, studentId, dueDateStr, remarks = "", issueDateStr = null) {
     const data = this._getData();
-    const book = data.books.find(b => b.id === Number(bookId));
-    const student = data.students.find(s => s.id === Number(studentId));
+    const book = data.books.find(b => this.matchId(b.id, bookId) || this.matchId(b.book_id, bookId));
+    const student = data.students.find(s => this.matchId(s.id, studentId) || this.matchId(s.student_id, studentId));
 
     if (!book) throw new Error("Selected book was not found.");
     if (!student) throw new Error("Selected student was not found.");
-    if (book.available <= 0) throw new Error(`'${book.title}' is currently out of stock.`);
+    if ((book.available_copies ?? book.available ?? 0) <= 0) throw new Error(`'${book.title}' is currently out of stock.`);
     const todayStr = new Date().toISOString().split('T')[0];
     const reissueCooldown = data.transactions
-      .filter(tx => Number(tx.student_id) === Number(student.id) &&
-        Number(tx.book_id) === Number(book.id) &&
+      .filter(tx => this.matchId(tx.student_id, student.id) &&
+        this.matchId(tx.book_id, book.id) &&
         tx.status === 'returned' && Number(tx.reissue_count || 0) >= 2 && tx.return_date)
       .sort((left, right) => String(right.return_date).localeCompare(String(left.return_date)))[0];
     if (reissueCooldown) {
@@ -1020,20 +1102,21 @@ class LibraryDatabase {
     }
 
     // Active loan limit check (Maximum 4 books allowed)
-    const activeStudentLoans = data.transactions.filter(t => t.student_id === student.id && t.status === 'issued');
+    const activeStudentLoans = data.transactions.filter(t => this.matchId(t.student_id, student.id) && t.status === 'issued');
     if (activeStudentLoans.length >= 4) {
       throw new Error(`Circulation Limit Reached: ${student.name} already holds ${activeStudentLoans.length} active books. Maximum 4 books allowed per student.`);
     }
 
     const normalizedIssueDate = issueDateStr || todayStr;
-    const newId = data.transactions.length > 0 ? Math.max(...data.transactions.map(t => t.id)) + 1 : 1;
+    const newId = this.generateId('issue');
 
     const newTx = {
       id: newId,
-      book_id: book.id,
+      issue_id: newId,
+      book_id: book.book_id || book.id,
       book_title: book.title,
       book_isbn: book.isbn,
-      student_id: student.id,
+      student_id: student.student_id || student.id,
       issue_date: normalizedIssueDate,
       due_date: dueDateStr,
       return_date: null,
@@ -1044,7 +1127,8 @@ class LibraryDatabase {
     };
 
     // Update inventory
-    book.available -= 1;
+    book.available = Math.max(0, (book.available_copies ?? book.available ?? 1) - 1);
+    book.available_copies = book.available;
     book.borrow_count = (book.borrow_count || 0) + 1;
 
     data.transactions.push(newTx);
@@ -1053,12 +1137,12 @@ class LibraryDatabase {
       student.issue_permission_used_at = new Date().toISOString();
     }
     this._saveData(data);
-    return this.getTransactions().find(t => t.id === newTx.id);
+    return this.getTransactions().find(t => this.matchId(t.id, newId));
   }
 
   returnBook(transactionId, fineAction = "none", fineAmount = 0, returnRemarks = "", paymentMethod = "") {
     const data = this._getData();
-    const tx = data.transactions.find(t => t.id === Number(transactionId));
+    const tx = data.transactions.find(t => this.matchId(t.id, transactionId) || this.matchId(t.issue_id, transactionId));
     if (!tx) throw new Error("Transaction not found.");
     if (tx.status === 'returned') throw new Error("Book is already marked as returned.");
     if (fineAction === "paid" && Number(fineAmount) <= 0) {
@@ -1069,10 +1153,11 @@ class LibraryDatabase {
     }
 
     const todayStr = new Date().toISOString().split('T')[0];
-    const book = data.books.find(b => b.id === tx.book_id);
+    const book = data.books.find(b => this.matchId(b.id, tx.book_id) || this.matchId(b.book_id, tx.book_id));
 
     tx.status = 'returned';
     tx.return_date = todayStr;
+    tx.return_id = this.generateId('return');
     tx.fine = fineAmount;
     tx.fine_status = fineAction; // 'paid', 'waived', 'none'
     tx.payment_method = fineAction === "paid" ? paymentMethod : "";
@@ -1082,11 +1167,108 @@ class LibraryDatabase {
 
     // Restore book availability
     if (book) {
-      book.available = Math.min(book.quantity, book.available + 1);
+      book.available = Math.min(book.total_copies ?? book.quantity, (book.available_copies ?? book.available ?? 0) + 1);
+      book.available_copies = book.available;
     }
 
     this._saveData(data);
     return tx;
+  }
+
+  // --- Student Book Requests CRUD ---
+  getBookRequests() {
+    const data = this._getData();
+    data.book_requests ||= [];
+    return data.book_requests.map(r => {
+      const book = (data.books || []).find(b => this.matchId(b.id, r.book_id) || this.matchId(b.book_id, r.book_id));
+      const student = (data.students || []).find(s => this.matchId(s.id, r.student_id) || this.matchId(s.student_id, r.student_id));
+      return {
+        ...r,
+        book_title: r.book_title || book?.title || 'Unknown Title',
+        author: r.author || book?.author || '',
+        isbn: r.isbn || book?.isbn || '',
+        student_name: r.student_name || student?.name || 'Unknown Student',
+        student_roll: r.student_roll || student?.roll_no || '—',
+        available_copies: book ? Number(book.available_copies ?? book.available ?? 0) : 0,
+        total_copies: book ? Number(book.total_copies ?? book.quantity ?? 1) : 0
+      };
+    }).sort((a, b) => String(b.requested_at || b.id).localeCompare(String(a.requested_at || a.id)));
+  }
+
+  addBookRequest(reqData) {
+    const data = this._getData();
+    data.book_requests ||= [];
+    const book = (data.books || []).find(b => this.matchId(b.id, reqData.book_id) || this.matchId(b.book_id, reqData.book_id));
+    if (!book) throw new Error("Selected book was not found.");
+
+    const student = (data.students || []).find(s => this.matchId(s.id, reqData.student_id) || this.matchId(s.student_id, reqData.student_id));
+    if (!student) throw new Error("Student was not found.");
+
+    const existing = data.book_requests.find(r => this.matchId(r.student_id, student.id) && this.matchId(r.book_id, book.id) && ['pending', 'approved'].includes(String(r.status).toLowerCase()));
+    if (existing) {
+      throw new Error("You already have an active request for this book.");
+    }
+
+    const newId = this.generateId('request');
+    const newRequest = {
+      id: newId,
+      request_id: newId,
+      student_id: student.student_id || student.id,
+      student_name: student.name,
+      student_roll: student.roll_no,
+      book_id: book.book_id || book.id,
+      book_title: book.title || book.book_name,
+      author: book.author || '',
+      isbn: book.isbn || '',
+      category: book.category || '',
+      status: 'Pending',
+      requested_at: new Date().toISOString(),
+      notes: String(reqData.notes || '').trim()
+    };
+
+    data.book_requests.push(newRequest);
+    this._saveData(data);
+    return newRequest;
+  }
+
+  approveBookRequest(requestId) {
+    const data = this._getData();
+    data.book_requests ||= [];
+    const req = data.book_requests.find(r => this.matchId(r.id, requestId) || this.matchId(r.request_id, requestId));
+    if (!req) throw new Error("Request not found.");
+    if (req.status === 'Approved') throw new Error("Request has already been approved.");
+
+    const book = data.books.find(b => this.matchId(b.id, req.book_id) || this.matchId(b.book_id, req.book_id));
+    if (!book) throw new Error("Book not found in library inventory.");
+    if ((book.available_copies ?? book.available ?? 0) <= 0) {
+      throw new Error(`'${book.title}' is currently out of stock. Cannot approve request.`);
+    }
+
+    const student = data.students.find(s => this.matchId(s.id, req.student_id) || this.matchId(s.student_id, req.student_id));
+
+    // Calculate due date (14 days)
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 14);
+    const dueDateStr = dueDate.toISOString().split('T')[0];
+
+    const tx = this.issueBook(book.id, student ? student.id : req.student_id, dueDateStr, `Issued via approved request ${req.request_id || req.id}`);
+    req.status = 'Approved';
+    req.approved_at = new Date().toISOString();
+    req.issue_id = tx.id;
+    this._saveData(data);
+    return { request: req, transaction: tx };
+  }
+
+  rejectBookRequest(requestId, reason = "Requested title cannot be fulfilled at this time.") {
+    const data = this._getData();
+    data.book_requests ||= [];
+    const req = data.book_requests.find(r => this.matchId(r.id, requestId) || this.matchId(r.request_id, requestId));
+    if (!req) throw new Error("Request not found.");
+    req.status = 'Rejected';
+    req.rejected_at = new Date().toISOString();
+    req.rejection_reason = String(reason || '').trim();
+    this._saveData(data);
+    return req;
   }
 
   // --- Alerts & Overdue Queries ---

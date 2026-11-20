@@ -57,6 +57,7 @@ const STATIC_ASSETS = {
   '/js/db.js': { file: path.join(__dirname, 'js', 'db.js'), type: 'text/javascript; charset=utf-8' },
   '/js/charts.js': { file: path.join(__dirname, 'js', 'charts.js'), type: 'text/javascript; charset=utf-8' },
   '/js/qr.js': { file: path.join(__dirname, 'js', 'qr.js'), type: 'text/javascript; charset=utf-8' },
+  '/js/student-portal.js': { file: path.join(__dirname, 'js', 'student-portal.js'), type: 'text/javascript; charset=utf-8' },
   '/js/xlsx_import.js': { file: path.join(__dirname, 'js', 'xlsx_import.js'), type: 'text/javascript; charset=utf-8' },
   '/login.html': { file: path.join(__dirname, 'login.html'), type: 'text/html; charset=utf-8' },
   '/student.html': { file: path.join(__dirname, 'student.html'), type: 'text/html; charset=utf-8' },
@@ -83,93 +84,284 @@ function verifyPassword(password, salt, expectedHash) {
 }
 
 // ---------------------------------------------------------------------------
+// ID Sequence Tracking and Formatting Helpers (Dual-Compatible & Auto-Generated)
+// ---------------------------------------------------------------------------
+function matchId(a, b) {
+  if (a === undefined || a === null || b === undefined || b === null) return false;
+  const strA = String(a).trim().toLowerCase();
+  const strB = String(b).trim().toLowerCase();
+  if (strA === strB) return true;
+  const numA = parseInt(strA.replace(/\D/g, ''), 10);
+  const numB = parseInt(strB.replace(/\D/g, ''), 10);
+  if (!isNaN(numA) && !isNaN(numB) && numA === numB && numA > 0) return true;
+  return false;
+}
+
+function nextSequence(state, entity) {
+  state.sequences = state.sequences || {};
+  let current = Number(state.sequences[entity]) || 0;
+  if (current === 0) {
+    if (entity === 'subject' && Array.isArray(state.subjects)) {
+      current = state.subjects.reduce((max, s) => Math.max(max, parseInt(String(s.subject_id).replace(/\D/g, ''), 10) || 0), 0);
+    } else if (entity === 'book' && Array.isArray(state.books)) {
+      current = state.books.reduce((max, b) => Math.max(max, parseInt(String(b.book_id || b.id).replace(/\D/g, ''), 10) || 0), 0);
+    } else if (entity === 'student' && Array.isArray(state.students)) {
+      current = state.students.reduce((max, s) => Math.max(max, parseInt(String(s.student_id || s.id).replace(/\D/g, ''), 10) || 0), 0);
+    } else if (entity === 'faculty' && Array.isArray(state.faculty)) {
+      current = state.faculty.reduce((max, f) => Math.max(max, parseInt(String(f.faculty_id || f.id).replace(/\D/g, ''), 10) || 0), 0);
+    } else if (entity === 'issue' && Array.isArray(state.transactions)) {
+      current = state.transactions.reduce((max, t) => Math.max(max, parseInt(String(t.issue_id || t.id).replace(/\D/g, ''), 10) || 0), 0);
+    } else if (entity === 'return' && Array.isArray(state.transactions)) {
+      current = state.transactions.reduce((max, t) => Math.max(max, parseInt(String(t.return_id).replace(/\D/g, ''), 10) || 0), 0);
+    } else if (entity === 'request' && Array.isArray(state.book_requests)) {
+      current = state.book_requests.reduce((max, r) => Math.max(max, parseInt(String(r.request_id || r.id).replace(/\D/g, ''), 10) || 0), 0);
+    }
+  }
+  current += 1;
+  state.sequences[entity] = current;
+  return current;
+}
+
+function generateId(state, entity) {
+  const seq = nextSequence(state, entity);
+  switch (entity) {
+    case 'subject':
+      return `SUB-${String(seq).padStart(4, '0')}`;
+    case 'book':
+      return `DGI-BK-${String(seq).padStart(6, '0')}`;
+    case 'student':
+      return `DGI-STU-${String(seq).padStart(6, '0')}`;
+    case 'faculty':
+      return `DGI-FAC-${String(seq).padStart(6, '0')}`;
+    case 'issue':
+      return `DGI-ISS-${String(seq).padStart(6, '0')}`;
+    case 'return':
+      return `DGI-RET-${String(seq).padStart(6, '0')}`;
+    case 'request':
+      return `DGI-REQ-${String(seq).padStart(6, '0')}`;
+    default:
+      return `${entity.toUpperCase()}-${String(seq).padStart(6, '0')}`;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Persistent store (single JSON file)
 // ---------------------------------------------------------------------------
 function defaultSubjects() {
   return [
-    { subject_id: 1, subject_name: "Computer Science Fundamentals", subject_code: "CS-101", description: "Core computer science principles, discrete structures, and theoretical computation.", icon: "💻" },
-    { subject_id: 2, subject_name: "Programming & Software Development", subject_code: "CS-102", description: "Object-oriented programming, C++, Java, Python, and data structures.", icon: "⚡" },
-    { subject_id: 3, subject_name: "Databases & Information Systems", subject_code: "CS-103", description: "Relational database management, SQL, query processing, and data architecture.", icon: "🗄️" },
-    { subject_id: 4, subject_name: "Artificial Intelligence & Data Science", subject_code: "CS-104", description: "Machine learning algorithms, neural networks, computer vision, and modern AI.", icon: "🤖" },
-    { subject_id: 5, subject_name: "Operating Systems", subject_code: "CS-105", description: "Kernel architecture, process synchronization, memory management, and file systems.", icon: "⚙️" },
-    { subject_id: 6, subject_name: "Computer Networks", subject_code: "CS-106", description: "Network layers, protocols, TCP/IP, wireless routing, and data communication.", icon: "🌐" },
-    { subject_id: 7, subject_name: "Cyber Security & Cloud", subject_code: "CS-107", description: "Network security, cryptography, cloud computing infrastructure, and virtualization.", icon: "🔒" },
-    { subject_id: 8, subject_name: "Software Engineering & Architecture", subject_code: "CS-108", description: "Software engineering methodologies, system design patterns, and clean code principles.", icon: "📐" },
-    { subject_id: 9, subject_name: "Electronics & Communication", subject_code: "EC-201", description: "Semiconductor physics, analog and digital electronics, and circuit theory.", icon: "📡" },
-    { subject_id: 10, subject_name: "Mechanical Engineering", subject_code: "ME-301", description: "Engineering mechanics, statics, dynamics, thermodynamics, and manufacturing.", icon: "🔧" },
-    { subject_id: 11, subject_name: "Mathematics & Applied Sciences", subject_code: "AS-101", description: "Engineering mathematics, calculus, linear algebra, and numerical techniques.", icon: "📊" }
+    { subject_id: "SUB-0001", subject_name: "Computer Science Fundamentals", subject_code: "CS-101", description: "Core computer science principles, discrete structures, and theoretical computation.", icon: "💻" },
+    { subject_id: "SUB-0002", subject_name: "Programming & Software Development", subject_code: "CS-102", description: "Object-oriented programming, C++, Java, Python, and data structures.", icon: "⚡" },
+    { subject_id: "SUB-0003", subject_name: "Databases & Information Systems", subject_code: "CS-103", description: "Relational database management, SQL, query processing, and data architecture.", icon: "🗄️" },
+    { subject_id: "SUB-0004", subject_name: "Artificial Intelligence & Data Science", subject_code: "CS-104", description: "Machine learning algorithms, neural networks, computer vision, and modern AI.", icon: "🤖" },
+    { subject_id: "SUB-0005", subject_name: "Operating Systems", subject_code: "CS-105", description: "Kernel architecture, process synchronization, memory management, and file systems.", icon: "⚙️" },
+    { subject_id: "SUB-0006", subject_name: "Computer Networks", subject_code: "CS-106", description: "Network layers, protocols, TCP/IP, wireless routing, and data communication.", icon: "🌐" },
+    { subject_id: "SUB-0007", subject_name: "Cyber Security & Cloud", subject_code: "CS-107", description: "Network security, cryptography, cloud computing infrastructure, and virtualization.", icon: "🔒" },
+    { subject_id: "SUB-0008", subject_name: "Software Engineering & Architecture", subject_code: "CS-108", description: "Software engineering methodologies, system design patterns, and clean code principles.", icon: "📐" },
+    { subject_id: "SUB-0009", subject_name: "Electronics & Communication", subject_code: "EC-201", description: "Semiconductor physics, analog and digital electronics, and circuit theory.", icon: "📡" },
+    { subject_id: "SUB-0010", subject_name: "Mechanical Engineering", subject_code: "ME-301", description: "Engineering mechanics, statics, dynamics, thermodynamics, and manufacturing.", icon: "🔧" },
+    { subject_id: "SUB-0011", subject_name: "Mathematics & Applied Sciences", subject_code: "AS-101", description: "Engineering mathematics, calculus, linear algebra, and numerical techniques.", icon: "📊" }
   ];
 }
 
 function mapBookToSubjectId(book) {
   const t = (String(book.title || '') + ' ' + String(book.category || '')).toLowerCase();
-  if (t.includes('database') || t.includes('dbms') || t.includes('sql')) return 3;
-  if (t.includes('operating system') || t.includes('os internals')) return 5;
-  if (t.includes('network')) return 6;
-  if (t.includes('artificial intelligence') || t.includes('machine learning')) return 4;
-  if (t.includes('clean code') || t.includes('software engineering')) return 8;
-  if (t.includes('cloud')) return 7;
-  if (t.includes('electronic') || t.includes('circuit')) return 9;
-  if (t.includes('mechanic') || t.includes('mechanical')) return 10;
-  if (t.includes('data structure') || t.includes('java') || t.includes('programming') || t.includes('algorithm') || t.includes('web tech')) return 2;
-  if (t.includes('automata') || t.includes('computer science') || t.includes('theory')) return 1;
-  return 1;
+  if (t.includes('database') || t.includes('dbms') || t.includes('sql')) return "SUB-0003";
+  if (t.includes('operating system') || t.includes('os internals')) return "SUB-0005";
+  if (t.includes('network')) return "SUB-0006";
+  if (t.includes('artificial intelligence') || t.includes('machine learning')) return "SUB-0004";
+  if (t.includes('clean code') || t.includes('software engineering')) return "SUB-0008";
+  if (t.includes('cloud')) return "SUB-0007";
+  if (t.includes('electronic') || t.includes('circuit')) return "SUB-0009";
+  if (t.includes('mechanic') || t.includes('mechanical')) return "SUB-0010";
+  if (t.includes('data structure') || t.includes('java') || t.includes('programming') || t.includes('algorithm') || t.includes('web tech')) return "SUB-0002";
+  if (t.includes('automata') || t.includes('computer science') || t.includes('theory')) return "SUB-0001";
+  return "SUB-0001";
 }
 
 function ensureDatabaseIntegrity(state) {
   if (!state || typeof state !== 'object') return;
+  state.sequences = state.sequences || {};
   if (!Array.isArray(state.subjects) || state.subjects.length === 0) {
     state.subjects = defaultSubjects();
   }
-  if (!Array.isArray(state.book_requests)) {
-    state.book_requests = [];
-  }
-  if (Array.isArray(state.books)) {
-    state.books.forEach((b, idx) => {
-      b.id = Number(b.id) || (idx + 1);
-      b.book_id = Number(b.book_id) || b.id;
-      b.book_name = b.book_name || b.title || `Book #${b.book_id}`;
-      b.title = b.title || b.book_name;
-      b.subject_id = Number(b.subject_id) || mapBookToSubjectId(b);
-      const sub = state.subjects.find(s => s.subject_id === b.subject_id);
-      if (sub && !b.category) b.category = sub.subject_name;
-      b.total_copies = Number(b.total_copies ?? b.quantity ?? 1);
-      b.available_copies = Number(b.available_copies ?? b.available ?? b.total_copies);
-      b.quantity = b.total_copies;
-      b.available = b.available_copies;
-      b.publication_year = b.publication_year ?? b.published_year ?? 2024;
-      b.publisher = b.publisher || 'DGI Academic Press';
-      b.isbn = b.isbn || ('978-DGI-' + String(b.book_id).padStart(4, '0'));
-    });
-  }
+  if (!Array.isArray(state.books)) state.books = [];
+  if (!Array.isArray(state.students)) state.students = [];
+  if (!Array.isArray(state.faculty)) state.faculty = [];
+  if (!Array.isArray(state.transactions)) state.transactions = [];
+  if (!Array.isArray(state.faculty_transactions)) state.faculty_transactions = [];
+  if (!Array.isArray(state.book_requests)) state.book_requests = [];
+
+  // 1. Subjects migration & normalization
+  const subjectIdMap = {};
+  let maxSubNum = Number(state.sequences.subject) || 0;
+  state.subjects.forEach((s, idx) => {
+    const rawId = s.subject_id;
+    let num = parseInt(String(rawId).replace(/\D/g, ''), 10);
+    if (isNaN(num) || num <= 0) num = idx + 1;
+    if (num > maxSubNum) maxSubNum = num;
+    const formattedId = `SUB-${String(num).padStart(4, '0')}`;
+    subjectIdMap[String(rawId)] = formattedId;
+    s.subject_id = formattedId;
+    s.subject_name = String(s.subject_name || s.name || `Subject ${formattedId}`).trim();
+    s.subject_code = String(s.subject_code || s.code || `CS-${100 + num}`).trim();
+    s.icon = s.icon || '📖';
+    s.description = s.description || '';
+  });
+  state.sequences.subject = maxSubNum;
+
+  // 2. Books migration & normalization
+  const bookIdMap = {};
+  let maxBkNum = Number(state.sequences.book) || 0;
+  state.books.forEach((b, idx) => {
+    const rawId = b.book_id || b.id;
+    let num = parseInt(String(rawId).replace(/\D/g, ''), 10);
+    if (isNaN(num) || num <= 0) num = idx + 1;
+    if (num > maxBkNum) maxBkNum = num;
+    const formattedId = `DGI-BK-${String(num).padStart(6, '0')}`;
+    bookIdMap[String(rawId)] = formattedId;
+    bookIdMap[String(b.id)] = formattedId;
+    b.id = formattedId;
+    b.book_id = formattedId;
+    b.book_name = b.book_name || b.title || `Book #${formattedId}`;
+    b.title = b.title || b.book_name;
+    b.author = b.author || 'Unknown Author';
+
+    // Map subject_id safely
+    if (b.subject_id && subjectIdMap[String(b.subject_id)]) {
+      b.subject_id = subjectIdMap[String(b.subject_id)];
+    } else {
+      let sub = state.subjects.find(s => matchId(s.subject_id, b.subject_id));
+      if (!sub && b.category) {
+        sub = state.subjects.find(s => s.subject_name.toLowerCase() === String(b.category).trim().toLowerCase());
+      }
+      if (!sub) {
+        const mappedSub = mapBookToSubjectId(b);
+        sub = state.subjects.find(s => matchId(s.subject_id, mappedSub)) || state.subjects[0];
+      }
+      b.subject_id = sub ? sub.subject_id : state.subjects[0].subject_id;
+    }
+
+    const sub = state.subjects.find(s => matchId(s.subject_id, b.subject_id));
+    if (sub && (!b.category || b.category === 'CSIT' || b.category === 'General')) {
+      b.category = sub.subject_name;
+    }
+    b.total_copies = Math.max(1, parseInt(b.total_copies ?? b.quantity ?? 1, 10));
+    b.available_copies = Math.max(0, parseInt(b.available_copies ?? b.available ?? b.total_copies, 10));
+    if (b.available_copies > b.total_copies) b.available_copies = b.total_copies;
+    b.quantity = b.total_copies;
+    b.available = b.available_copies;
+    b.publication_year = parseInt(b.publication_year ?? b.published_year ?? 2024, 10);
+    b.published_year = b.publication_year;
+    b.publisher = b.publisher || 'DGI Academic Press';
+    b.isbn = b.isbn || `978-DGI-${String(num).padStart(4, '0')}`;
+    b.shelf_location = b.shelf_location || `Stack ${sub?.subject_code || 'CS-101'}`;
+  });
+  state.sequences.book = maxBkNum;
+
+  // 3. Students migration & normalization
+  const studentIdMap = {};
+  let maxStuNum = Number(state.sequences.student) || 0;
+  state.students.forEach((s, idx) => {
+    const rawId = s.student_id || s.id;
+    let num = parseInt(String(rawId).replace(/\D/g, ''), 10);
+    if (isNaN(num) || num <= 0) num = idx + 1;
+    if (num > maxStuNum) maxStuNum = num;
+    const formattedId = `DGI-STU-${String(num).padStart(6, '0')}`;
+    studentIdMap[String(rawId)] = formattedId;
+    studentIdMap[String(s.id)] = formattedId;
+    s.id = formattedId;
+    s.student_id = formattedId;
+    s.name = String(s.name || 'Student').trim();
+    s.roll_no = String(s.roll_no || `STU${num}`).trim().toUpperCase();
+    s.department = s.department || 'CSIT';
+  });
+  state.sequences.student = maxStuNum;
+
+  // 4. Faculty migration & normalization
+  let maxFacNum = Number(state.sequences.faculty) || 0;
+  state.faculty.forEach((f, idx) => {
+    const rawId = f.faculty_id || f.id;
+    let num = parseInt(String(rawId).replace(/\D/g, ''), 10);
+    if (isNaN(num) || num <= 0) num = idx + 1;
+    if (num > maxFacNum) maxFacNum = num;
+    const formattedId = `DGI-FAC-${String(num).padStart(6, '0')}`;
+    f.id = formattedId;
+    f.faculty_id = formattedId;
+  });
+  state.sequences.faculty = maxFacNum;
+
+  // 5. Transactions migration & normalization
+  let maxIssNum = Number(state.sequences.issue) || 0;
+  let maxRetNum = Number(state.sequences.return) || 0;
+  state.transactions.forEach((t, idx) => {
+    if (t.student_id && studentIdMap[String(t.student_id)]) {
+      t.student_id = studentIdMap[String(t.student_id)];
+    }
+    if (t.book_id && bookIdMap[String(t.book_id)]) {
+      t.book_id = bookIdMap[String(t.book_id)];
+    }
+    let num = parseInt(String(t.issue_id || t.id).replace(/\D/g, ''), 10);
+    if (isNaN(num) || num <= 0) num = idx + 1;
+    if (num > maxIssNum) maxIssNum = num;
+    t.issue_id = `DGI-ISS-${String(num).padStart(6, '0')}`;
+    t.id = t.issue_id;
+
+    if (t.status === 'returned') {
+      let rNum = parseInt(String(t.return_id).replace(/\D/g, ''), 10);
+      if (isNaN(rNum) || rNum <= 0) rNum = num;
+      if (rNum > maxRetNum) maxRetNum = rNum;
+      t.return_id = `DGI-RET-${String(rNum).padStart(6, '0')}`;
+    }
+  });
+  state.sequences.issue = maxIssNum;
+  state.sequences.return = maxRetNum;
+
+  // 6. Book Requests migration & normalization
+  let maxReqNum = Number(state.sequences.request) || 0;
+  state.book_requests.forEach((r, idx) => {
+    if (r.student_id && studentIdMap[String(r.student_id)]) {
+      r.student_id = studentIdMap[String(r.student_id)];
+    }
+    if (r.book_id && bookIdMap[String(r.book_id)]) {
+      r.book_id = bookIdMap[String(r.book_id)];
+    }
+    let num = parseInt(String(r.request_id || r.id).replace(/\D/g, ''), 10);
+    if (isNaN(num) || num <= 0) num = idx + 1;
+    if (num > maxReqNum) maxReqNum = num;
+    const formattedId = `DGI-REQ-${String(num).padStart(6, '0')}`;
+    r.id = formattedId;
+    r.request_id = formattedId;
+    r.status = r.status || 'Pending';
+  });
+  state.sequences.request = maxReqNum;
 }
 
 function defaultLibraryState() {
   const subjects = defaultSubjects();
   const books = [
-    { id: 1, book_id: 1, title: "Data Structures & Algorithms in C++", book_name: "Data Structures & Algorithms in C++", author: "Mark Allen Weiss", subject_id: 2, isbn: "978-0132847377", publisher: "Pearson", publication_year: 2013, category: "Programming & Software Development", shelf_location: "Stack CS-101", total_copies: 5, available_copies: 3, quantity: 5, available: 3 },
-    { id: 2, book_id: 2, title: "Database System Concepts", book_name: "Database System Concepts", author: "Silberschatz, Korth, Sudarshan", subject_id: 3, isbn: "978-0078022159", publisher: "McGraw-Hill", publication_year: 2019, category: "Databases & Information Systems", shelf_location: "Stack CS-102", total_copies: 6, available_copies: 1, quantity: 6, available: 1 },
-    { id: 3, book_id: 3, title: "Operating System Concepts", book_name: "Operating System Concepts", author: "Abraham Silberschatz, Peter B. Galvin", subject_id: 5, isbn: "978-1118063330", publisher: "Wiley", publication_year: 2018, category: "Operating Systems", shelf_location: "Stack CS-103", total_copies: 4, available_copies: 2, quantity: 4, available: 2 },
-    { id: 4, book_id: 4, title: "Computer Networks", book_name: "Computer Networks", author: "Andrew S. Tanenbaum", subject_id: 6, isbn: "978-0132126953", publisher: "Pearson", publication_year: 2020, category: "Computer Networks", shelf_location: "Stack CS-104", total_copies: 5, available_copies: 4, quantity: 5, available: 4 },
-    { id: 5, book_id: 5, title: "Artificial Intelligence: A Modern Approach", book_name: "Artificial Intelligence: A Modern Approach", author: "Stuart Russell, Peter Norvig", subject_id: 4, isbn: "978-0136042594", publisher: "Pearson", publication_year: 2021, category: "Artificial Intelligence & Data Science", shelf_location: "Stack CS-105", total_copies: 3, available_copies: 1, quantity: 3, available: 1 },
-    { id: 6, book_id: 6, title: "Web Technologies: HTML, CSS, JavaScript & PHP", book_name: "Web Technologies: HTML, CSS, JavaScript & PHP", author: "Uttam K. Roy", subject_id: 2, isbn: "978-0198066224", publisher: "Oxford", publication_year: 2018, category: "Programming & Software Development", shelf_location: "Stack CS-106", total_copies: 4, available_copies: 3, quantity: 4, available: 3 },
-    { id: 7, book_id: 7, title: "Theory of Computer Science: Automata, Languages", book_name: "Theory of Computer Science: Automata, Languages", author: "K.L.P. Mishra, N. Chandrasekaran", subject_id: 1, isbn: "978-8120329683", publisher: "PHI Learning", publication_year: 2014, category: "Computer Science Fundamentals", shelf_location: "Stack CS-107", total_copies: 4, available_copies: 2, quantity: 4, available: 2 },
-    { id: 8, book_id: 8, title: "Software Engineering: A Practitioner's Approach", book_name: "Software Engineering: A Practitioner's Approach", author: "Roger S. Pressman", subject_id: 8, isbn: "978-0078022128", publisher: "McGraw-Hill", publication_year: 2019, category: "Software Engineering & Architecture", shelf_location: "Stack CS-108", total_copies: 5, available_copies: 0, quantity: 5, available: 0 },
-    { id: 9, book_id: 9, title: "Electronic Devices and Circuit Theory", book_name: "Electronic Devices and Circuit Theory", author: "Robert L. Boylestad, Louis Nashelsky", subject_id: 9, isbn: "978-0137692828", publisher: "Pearson", publication_year: 2015, category: "Electronics & Communication", shelf_location: "Stack EC-201", total_copies: 3, available_copies: 1, quantity: 3, available: 1 },
-    { id: 10, book_id: 10, title: "Engineering Mechanics: Statics and Dynamics", book_name: "Engineering Mechanics: Statics and Dynamics", author: "S. Timoshenko, D.H. Young", subject_id: 10, isbn: "978-0070616806", publisher: "McGraw-Hill", publication_year: 2017, category: "Mechanical Engineering", shelf_location: "Stack ME-301", total_copies: 5, available_copies: 4, quantity: 5, available: 4 }
+    { id: "DGI-BK-000001", book_id: "DGI-BK-000001", title: "Data Structures & Algorithms in C++", book_name: "Data Structures & Algorithms in C++", author: "Mark Allen Weiss", subject_id: "SUB-0002", isbn: "978-0132847377", publisher: "Pearson", publication_year: 2013, category: "Programming & Software Development", shelf_location: "Stack CS-101", total_copies: 5, available_copies: 3, quantity: 5, available: 3 },
+    { id: "DGI-BK-000002", book_id: "DGI-BK-000002", title: "Database System Concepts", book_name: "Database System Concepts", author: "Silberschatz, Korth, Sudarshan", subject_id: "SUB-0003", isbn: "978-0078022159", publisher: "McGraw-Hill", publication_year: 2019, category: "Databases & Information Systems", shelf_location: "Stack CS-102", total_copies: 6, available_copies: 1, quantity: 6, available: 1 },
+    { id: "DGI-BK-000003", book_id: "DGI-BK-000003", title: "Operating System Concepts", book_name: "Operating System Concepts", author: "Abraham Silberschatz, Peter B. Galvin", subject_id: "SUB-0005", isbn: "978-1118063330", publisher: "Wiley", publication_year: 2018, category: "Operating Systems", shelf_location: "Stack CS-103", total_copies: 4, available_copies: 2, quantity: 4, available: 2 },
+    { id: "DGI-BK-000004", book_id: "DGI-BK-000004", title: "Computer Networks", book_name: "Computer Networks", author: "Andrew S. Tanenbaum", subject_id: "SUB-0006", isbn: "978-0132126953", publisher: "Pearson", publication_year: 2020, category: "Computer Networks", shelf_location: "Stack CS-104", total_copies: 5, available_copies: 4, quantity: 5, available: 4 },
+    { id: "DGI-BK-000005", book_id: "DGI-BK-000005", title: "Artificial Intelligence: A Modern Approach", book_name: "Artificial Intelligence: A Modern Approach", author: "Stuart Russell, Peter Norvig", subject_id: "SUB-0004", isbn: "978-0136042594", publisher: "Pearson", publication_year: 2021, category: "Artificial Intelligence & Data Science", shelf_location: "Stack CS-105", total_copies: 3, available_copies: 1, quantity: 3, available: 1 },
+    { id: "DGI-BK-000006", book_id: "DGI-BK-000006", title: "Web Technologies: HTML, CSS, JavaScript & PHP", book_name: "Web Technologies: HTML, CSS, JavaScript & PHP", author: "Uttam K. Roy", subject_id: "SUB-0002", isbn: "978-0198066224", publisher: "Oxford", publication_year: 2018, category: "Programming & Software Development", shelf_location: "Stack CS-106", total_copies: 4, available_copies: 3, quantity: 4, available: 3 },
+    { id: "DGI-BK-000007", book_id: "DGI-BK-000007", title: "Theory of Computer Science: Automata, Languages", book_name: "Theory of Computer Science: Automata, Languages", author: "K.L.P. Mishra, N. Chandrasekaran", subject_id: "SUB-0001", isbn: "978-8120329683", publisher: "PHI Learning", publication_year: 2014, category: "Computer Science Fundamentals", shelf_location: "Stack CS-107", total_copies: 4, available_copies: 2, quantity: 4, available: 2 },
+    { id: "DGI-BK-000008", book_id: "DGI-BK-000008", title: "Software Engineering: A Practitioner's Approach", book_name: "Software Engineering: A Practitioner's Approach", author: "Roger S. Pressman", subject_id: "SUB-0008", isbn: "978-0078022128", publisher: "McGraw-Hill", publication_year: 2019, category: "Software Engineering & Architecture", shelf_location: "Stack CS-108", total_copies: 5, available_copies: 0, quantity: 5, available: 0 },
+    { id: "DGI-BK-000009", book_id: "DGI-BK-000009", title: "Electronic Devices and Circuit Theory", book_name: "Electronic Devices and Circuit Theory", author: "Robert L. Boylestad, Louis Nashelsky", subject_id: "SUB-0009", isbn: "978-0137692828", publisher: "Pearson", publication_year: 2015, category: "Electronics & Communication", shelf_location: "Stack EC-201", total_copies: 3, available_copies: 1, quantity: 3, available: 1 },
+    { id: "DGI-BK-000010", book_id: "DGI-BK-000010", title: "Engineering Mechanics: Statics and Dynamics", book_name: "Engineering Mechanics: Statics and Dynamics", author: "S. Timoshenko, D.H. Young", subject_id: "SUB-0010", isbn: "978-0070616806", publisher: "McGraw-Hill", publication_year: 2017, category: "Mechanical Engineering", shelf_location: "Stack ME-301", total_copies: 5, available_copies: 4, quantity: 5, available: 4 }
   ];
   const students = [
-    { id: 1, name: "Ayush Gupta", roll_no: "CS101", department: "CSIT", email: "ayush.csit@dronacharya.info", phone: "+91 98765 43210" },
-    { id: 2, name: "Priya Sharma", roll_no: "CS102", department: "CSIT", email: "priya.csit@dronacharya.info", phone: "+91 98765 43211" },
-    { id: 3, name: "Rahul Verma", roll_no: "CS103", department: "CSIT", email: "rahul.csit@dronacharya.info", phone: "+91 98765 43212" },
-    { id: 4, name: "Ananya Singh", roll_no: "CS104", department: "CSIT", email: "ananya.csit@dronacharya.info", phone: "+91 98765 43213" },
-    { id: 5, name: "Amit Kumar", roll_no: "ME101", department: "Mechanical", email: "amit.me@dronacharya.info", phone: "+91 98765 43214" }
+    { id: "DGI-STU-000001", student_id: "DGI-STU-000001", name: "Ayush Gupta", roll_no: "CS101", department: "CSIT", email: "ayush.csit@dronacharya.info", phone: "+91 98765 43210" },
+    { id: "DGI-STU-000002", student_id: "DGI-STU-000002", name: "Priya Sharma", roll_no: "CS102", department: "CSIT", email: "priya.csit@dronacharya.info", phone: "+91 98765 43211" },
+    { id: "DGI-STU-000003", student_id: "DGI-STU-000003", name: "Rahul Verma", roll_no: "CS103", department: "CSIT", email: "rahul.csit@dronacharya.info", phone: "+91 98765 43212" },
+    { id: "DGI-STU-000004", student_id: "DGI-STU-000004", name: "Ananya Singh", roll_no: "CS104", department: "CSIT", email: "ananya.csit@dronacharya.info", phone: "+91 98765 43213" },
+    { id: "DGI-STU-000005", student_id: "DGI-STU-000005", name: "Amit Kumar", roll_no: "ME101", department: "Mechanical", email: "amit.me@dronacharya.info", phone: "+91 98765 43214" }
   ];
   const transactions = [
-    { id: 1, student_id: 1, book_id: 2, book_title: "Database System Concepts", book_isbn: "978-0078022159", issue_date: "2026-11-05", due_date: "2026-11-19", return_date: null, status: "issued", fine: 0, reissue_count: 0 },
-    { id: 2, student_id: 1, book_id: 1, book_title: "Data Structures & Algorithms in C++", book_isbn: "978-0132847377", issue_date: "2026-10-10", due_date: "2026-10-24", return_date: "2026-10-22", status: "returned", fine: 0, reissue_count: 0 },
-    { id: 3, student_id: 1, book_id: 3, book_title: "Operating System Concepts", book_isbn: "978-1118063330", issue_date: "2026-09-01", due_date: "2026-09-15", return_date: "2026-09-14", status: "returned", fine: 0, reissue_count: 0 },
-    { id: 4, student_id: 2, book_id: 8, book_title: "Software Engineering: A Practitioner's Approach", book_isbn: "978-0078022128", issue_date: "2026-11-01", due_date: "2026-11-15", return_date: null, status: "issued", fine: 10, reissue_count: 1 }
+    { id: "DGI-ISS-000001", issue_id: "DGI-ISS-000001", student_id: "DGI-STU-000001", book_id: "DGI-BK-000002", book_title: "Database System Concepts", book_isbn: "978-0078022159", issue_date: "2026-11-05", due_date: "2026-11-19", return_date: null, status: "issued", fine: 0, reissue_count: 0 },
+    { id: "DGI-ISS-000002", issue_id: "DGI-ISS-000002", return_id: "DGI-RET-000001", student_id: "DGI-STU-000001", book_id: "DGI-BK-000001", book_title: "Data Structures & Algorithms in C++", book_isbn: "978-0132847377", issue_date: "2026-10-10", due_date: "2026-10-24", return_date: "2026-10-22", status: "returned", fine: 0, reissue_count: 0 },
+    { id: "DGI-ISS-000003", issue_id: "DGI-ISS-000003", return_id: "DGI-RET-000002", student_id: "DGI-STU-000001", book_id: "DGI-BK-000003", book_title: "Operating System Concepts", book_isbn: "978-1118063330", issue_date: "2026-09-01", due_date: "2026-09-15", return_date: "2026-09-14", status: "returned", fine: 0, reissue_count: 0 },
+    { id: "DGI-ISS-000004", issue_id: "DGI-ISS-000004", student_id: "DGI-STU-000002", book_id: "DGI-BK-000008", book_title: "Software Engineering: A Practitioner's Approach", book_isbn: "978-0078022128", issue_date: "2026-11-01", due_date: "2026-11-15", return_date: null, status: "issued", fine: 10, reissue_count: 1 }
   ];
   return {
     subjects,
@@ -178,6 +370,17 @@ function defaultLibraryState() {
     faculty: [],
     transactions,
     faculty_transactions: [],
+    alert_logs: [],
+    book_requests: [],
+    sequences: {
+      subject: 11,
+      book: 10,
+      student: 5,
+      faculty: 0,
+      issue: 4,
+      return: 2,
+      request: 0
+    },
     alert_logs: [],
     book_requests: [],
     settings: {
@@ -326,7 +529,7 @@ function verifySessionToken(token) {
     return {
       role,
       accountKey,
-      studentId: studentIdStr === 'null' ? null : Number(studentIdStr),
+      studentId: studentIdStr === 'null' ? null : studentIdStr,
       expiresAt
     };
   }
@@ -368,7 +571,7 @@ function getRequestSession(req) {
     if (session.role === 'student') {
       const primaryKey = (store.accounts.find(a => a.isPrimary) || store.accounts[0] || {}).key || 'admin';
       const state = (store.states[primaryKey] || {}).state || defaultLibraryState();
-      const student = (state.students || []).find(s => Number(s.id) === Number(session.studentId) || (session.rollNo && String(s.roll_no).toLowerCase() === session.rollNo.toLowerCase())) || session.student;
+      const student = (state.students || []).find(s => matchId(s.id, session.studentId) || matchId(s.student_id, session.studentId) || (session.rollNo && String(s.roll_no).toLowerCase() === session.rollNo.toLowerCase())) || session.student;
       return {
         role: 'student',
         accountKey: session.accountKey,
@@ -395,7 +598,7 @@ function getRequestSession(req) {
   if (verified.role === 'student') {
     const primaryKey = (store.accounts.find(a => a.isPrimary) || store.accounts[0] || {}).key || 'admin';
     const state = (store.states[primaryKey] || {}).state || defaultLibraryState();
-    const student = (state.students || []).find(s => Number(s.id) === Number(verified.studentId) || (verified.accountKey && String(s.roll_no).toLowerCase() === verified.accountKey.toLowerCase()));
+    const student = (state.students || []).find(s => matchId(s.id, verified.studentId) || matchId(s.student_id, verified.studentId) || (verified.accountKey && String(s.roll_no).toLowerCase() === verified.accountKey.toLowerCase()));
     return {
       role: 'student',
       accountKey: verified.accountKey,
@@ -639,9 +842,9 @@ async function handleRequest(req, res) {
       ensureDatabaseIntegrity(state);
 
       const roll = (session.role === 'student' ? session.rollNo : (url.searchParams.get('roll_no') || 'CS101')).toLowerCase();
-      const student = (state.students || []).find(s => String(s.roll_no || '').toLowerCase() === roll) || (state.students && state.students[0]) || { id: 1, name: "Student", roll_no: "CS101", department: "CSIT" };
+      const student = (state.students || []).find(s => (roll && String(s.roll_no || '').toLowerCase() === roll) || matchId(s.id, session.studentId) || matchId(s.student_id, session.studentId)) || (state.students && state.students[0]) || { id: "DGI-STU-000001", student_id: "DGI-STU-000001", name: "Student", roll_no: "CS101", department: "CSIT" };
 
-      const studentTx = (state.transactions || []).filter(t => Number(t.student_id) === Number(student.id));
+      const studentTx = (state.transactions || []).filter(t => matchId(t.student_id, student.id) || matchId(t.student_id, student.student_id));
       const currentlyIssued = studentTx.filter(t => t.status === 'issued');
       const returnedHistory = studentTx.filter(t => t.status === 'returned');
 
@@ -654,12 +857,13 @@ async function handleRequest(req, res) {
       });
 
       const totalAvailableCopies = (state.books || []).reduce((acc, b) => acc + Math.max(0, Number(b.available_copies ?? b.available ?? b.total_copies ?? 1)), 0);
-      const studentRequests = (state.book_requests || []).filter(r => Number(r.student_id) === Number(student.id));
-      const notifications = (store.messages[primaryKey] || []).filter(m => Number(m.borrowerId) === Number(student.id) || (m.student && String(m.student.rollNo).toLowerCase() === roll));
+      const studentRequests = (state.book_requests || []).filter(r => matchId(r.student_id, student.id) || matchId(r.student_id, student.student_id));
+      const notifications = (store.messages[primaryKey] || []).filter(m => matchId(m.borrowerId, student.id) || (m.student && String(m.student.rollNo).toLowerCase() === roll));
 
       return send(res, 200, {
         student: {
-          id: student.id,
+          id: student.id || student.student_id,
+          student_id: student.student_id || student.id,
           name: student.name,
           roll_no: student.roll_no,
           department: student.department || 'CSIT',
@@ -694,15 +898,16 @@ async function handleRequest(req, res) {
       ensureDatabaseIntegrity(state);
 
       const roll = (session.role === 'student' ? session.rollNo : (url.searchParams.get('roll_no') || 'CS101')).toLowerCase();
-      const student = (state.students || []).find(s => String(s.roll_no || '').toLowerCase() === roll);
+      const student = (state.students || []).find(s => (roll && String(s.roll_no || '').toLowerCase() === roll) || matchId(s.id, session.studentId) || matchId(s.student_id, session.studentId));
       if (!student) return send(res, 404, { error: 'Student record not found.' });
 
-      const studentTx = (state.transactions || []).filter(t => Number(t.student_id) === Number(student.id));
+      const studentTx = (state.transactions || []).filter(t => matchId(t.student_id, student.id) || matchId(t.student_id, student.student_id));
       const currentlyIssued = studentTx.filter(t => t.status === 'issued');
       const returnedHistory = studentTx.filter(t => t.status === 'returned');
 
       return send(res, 200, {
         currently_issued: currentlyIssued,
+        issuedBooks: currentlyIssued,
         history: returnedHistory,
         total_issued: currentlyIssued.length,
         total_returned: returnedHistory.length
@@ -717,7 +922,7 @@ async function handleRequest(req, res) {
       ensureDatabaseIntegrity(state);
 
       const roll = (session.role === 'student' ? session.rollNo : (url.searchParams.get('roll_no') || 'CS101')).toLowerCase();
-      const student = (state.students || []).find(s => String(s.roll_no || '').toLowerCase() === roll);
+      const student = (state.students || []).find(s => (roll && String(s.roll_no || '').toLowerCase() === roll) || matchId(s.id, session.studentId) || matchId(s.student_id, session.studentId));
       if (!student) return send(res, 404, { error: 'Student profile not found.' });
 
       return send(res, 200, { student });
@@ -731,10 +936,10 @@ async function handleRequest(req, res) {
       ensureDatabaseIntegrity(state);
 
       const roll = (session.role === 'student' ? session.rollNo : (url.searchParams.get('roll_no') || 'CS101')).toLowerCase();
-      const student = (state.students || []).find(s => String(s.roll_no || '').toLowerCase() === roll);
-      const studentId = student ? student.id : session.studentId;
+      const student = (state.students || []).find(s => (roll && String(s.roll_no || '').toLowerCase() === roll) || matchId(s.id, session.studentId) || matchId(s.student_id, session.studentId));
+      const studentId = student ? (student.student_id || student.id) : session.studentId;
 
-      const requests = (state.book_requests || []).filter(r => Number(r.student_id) === Number(studentId));
+      const requests = (state.book_requests || []).filter(r => matchId(r.student_id, studentId));
       return send(res, 200, { requests });
     }
 
@@ -742,36 +947,38 @@ async function handleRequest(req, res) {
       const session = requireStudentOrAdmin(req, res);
       if (!session) return;
       const b = await readBody(req);
-      const bookId = Number(b.book_id || b.id);
-      if (!bookId) return send(res, 400, { error: 'Book ID is required.' });
+      const targetBookId = b.book_id || b.id;
+      if (!targetBookId) return send(res, 400, { error: 'Book ID is required.' });
 
       const primaryKey = (store.accounts.find(a => a.isPrimary) || store.accounts[0] || {}).key || 'admin';
       const entry = accountState(primaryKey);
       const state = entry.state || (entry.state = defaultLibraryState());
       ensureDatabaseIntegrity(state);
 
-      const book = (state.books || []).find(bk => Number(bk.book_id) === bookId || Number(bk.id) === bookId);
+      const book = (state.books || []).find(bk => matchId(bk.book_id, targetBookId) || matchId(bk.id, targetBookId));
       if (!book) return send(res, 404, { error: 'Book not found in library catalog.' });
 
       const roll = (session.role === 'student' ? session.rollNo : (b.roll_no || 'CS101')).toLowerCase();
-      const student = (state.students || []).find(s => String(s.roll_no || '').toLowerCase() === roll) || { id: session.studentId || 1, name: session.username || "Student", roll_no: roll };
+      const student = (state.students || []).find(s => (roll && String(s.roll_no || '').toLowerCase() === roll) || matchId(s.id, session.studentId) || matchId(s.student_id, session.studentId)) || { id: session.studentId || "DGI-STU-000001", student_id: session.studentId || "DGI-STU-000001", name: session.username || "Student", roll_no: roll };
 
-      const existingReq = (state.book_requests || []).find(r => Number(r.student_id) === Number(student.id) && Number(r.book_id) === bookId && r.status === 'pending');
+      const existingReq = (state.book_requests || []).find(r => matchId(r.student_id, student.student_id || student.id) && matchId(r.book_id, book.book_id || book.id) && ['pending', 'approved'].includes(String(r.status).toLowerCase()));
       if (existingReq) {
-        return send(res, 409, { error: 'You already have an active pending request for this title.' });
+        return send(res, 409, { error: 'You already have an active request for this title.' });
       }
 
-      const nextReqId = (state.book_requests || []).reduce((max, r) => Math.max(max, Number(r.id) || 0), 0) + 1;
+      const nextReqId = generateId(state, 'request');
       const newRequest = {
         id: nextReqId,
-        student_id: student.id,
+        request_id: nextReqId,
+        student_id: student.student_id || student.id,
         student_name: student.name,
         student_roll: student.roll_no,
         book_id: book.book_id || book.id,
         book_title: book.title || book.book_name,
         author: book.author || '',
         isbn: book.isbn || '',
-        status: 'pending',
+        category: book.category || '',
+        status: 'Pending',
         requested_at: new Date().toISOString(),
         notes: String(b.notes || '').trim()
       };
@@ -784,17 +991,17 @@ async function handleRequest(req, res) {
       return send(res, 201, { success: true, request: newRequest });
     }
 
-    const cancelRequestMatch = p.match(/^\/api\/student\/book-requests\/(\d+)$/);
+    const cancelRequestMatch = p.match(/^\/api\/student\/book-requests\/([a-zA-Z0-9_-]+)$/);
     if (cancelRequestMatch && method === 'DELETE') {
       const session = requireStudentOrAdmin(req, res);
       if (!session) return;
-      const reqId = Number(cancelRequestMatch[1]);
+      const reqId = cancelRequestMatch[1];
       const primaryKey = (store.accounts.find(a => a.isPrimary) || store.accounts[0] || {}).key || 'admin';
       const entry = accountState(primaryKey);
       const state = entry.state || (entry.state = defaultLibraryState());
       ensureDatabaseIntegrity(state);
 
-      const rIndex = (state.book_requests || []).findIndex(r => Number(r.id) === reqId);
+      const rIndex = (state.book_requests || []).findIndex(r => matchId(r.id, reqId) || matchId(r.request_id, reqId));
       if (rIndex === -1) return send(res, 404, { error: 'Request not found.' });
 
       state.book_requests.splice(rIndex, 1);
@@ -812,9 +1019,9 @@ async function handleRequest(req, res) {
 
       const books = (Array.isArray(state.books) && state.books.length > 0) ? state.books : defaultState.books;
       const publicBooks = books.map(b => {
-        const sub = (state.subjects || []).find(s => Number(s.subject_id) === Number(b.subject_id)) || {};
+        const sub = (state.subjects || []).find(s => matchId(s.subject_id, b.subject_id)) || {};
         return {
-          id: b.id,
+          id: b.id || b.book_id,
           book_id: b.book_id || b.id,
           title: b.title || b.book_name,
           book_name: b.book_name || b.title,
@@ -835,7 +1042,7 @@ async function handleRequest(req, res) {
           rating: b.rating || 4.5
         };
       });
-      return send(res, 200, { books: publicBooks });
+      return send(res, 200, { books: publicBooks, subjects: state.subjects || [] });
     }
 
     if (p === '/api/student/status' && method === 'GET') {
@@ -856,12 +1063,13 @@ async function handleRequest(req, res) {
         return send(res, 404, { error: `Student with Roll Number '${url.searchParams.get('roll_no')}' not found.` });
       }
 
-      const studentTx = transactions.filter(t => Number(t.student_id) === Number(student.id));
+      const studentTx = transactions.filter(t => matchId(t.student_id, student.id) || matchId(t.student_id, student.student_id));
       const currentlyIssued = studentTx.filter(t => t.status === 'issued');
 
       return send(res, 200, {
         student: {
-          id: student.id,
+          id: student.id || student.student_id,
+          student_id: student.student_id || student.id,
           name: student.name,
           roll_no: student.roll_no,
           department: student.department || 'CSIT',
@@ -875,6 +1083,145 @@ async function handleRequest(req, res) {
       });
     }
 
+    // ============================ ADMIN BOOK REQUESTS MANAGEMENT ============
+    if (p === '/api/admin/book-requests' && method === 'GET') {
+      const account = requireAdmin(req, res);
+      if (!account) return;
+      const entry = accountState(account.key);
+      const state = entry.state || (entry.state = defaultLibraryState());
+      ensureDatabaseIntegrity(state);
+
+      const requests = (state.book_requests || []).map(r => {
+        const book = (state.books || []).find(b => matchId(b.book_id, r.book_id) || matchId(b.id, r.book_id));
+        const student = (state.students || []).find(s => matchId(s.student_id, r.student_id) || matchId(s.id, r.student_id));
+        return {
+          id: r.id || r.request_id,
+          request_id: r.request_id || r.id,
+          student_id: r.student_id,
+          student_name: r.student_name || student?.name || 'Unknown Student',
+          student_roll: r.student_roll || student?.roll_no || '—',
+          student_department: student?.department || 'CSIT',
+          book_id: r.book_id,
+          book_title: r.book_title || book?.title || 'Unknown Title',
+          author: r.author || book?.author || '',
+          isbn: r.isbn || book?.isbn || '',
+          category: r.category || book?.category || '',
+          status: r.status || 'Pending',
+          requested_at: r.requested_at,
+          notes: r.notes || '',
+          rejection_reason: r.rejection_reason || '',
+          available_copies: book ? Number(book.available_copies ?? book.available ?? 0) : 0,
+          total_copies: book ? Number(book.total_copies ?? book.quantity ?? 1) : 0
+        };
+      });
+
+      return send(res, 200, { requests });
+    }
+
+    const approveRequestMatch = p.match(/^\/api\/admin\/book-requests\/([a-zA-Z0-9_-]+)\/approve$/);
+    if (approveRequestMatch && method === 'POST') {
+      const account = requireAdmin(req, res);
+      if (!account) return;
+      const reqId = approveRequestMatch[1];
+      const entry = accountState(account.key);
+      const state = entry.state || (entry.state = defaultLibraryState());
+      ensureDatabaseIntegrity(state);
+
+      const request = (state.book_requests || []).find(r => matchId(r.id, reqId) || matchId(r.request_id, reqId));
+      if (!request) return send(res, 404, { error: 'Book request not found.' });
+      if (request.status === 'Approved') return send(res, 400, { error: 'Request has already been approved.' });
+
+      const book = (state.books || []).find(b => matchId(b.book_id, request.book_id) || matchId(b.id, request.book_id));
+      if (!book) return send(res, 404, { error: 'Associated book not found in catalog.' });
+      if (Number(book.available_copies ?? book.available ?? 0) <= 0) {
+        return send(res, 400, { error: `'${book.title}' is currently out of stock. Cannot approve request.` });
+      }
+
+      const student = (state.students || []).find(s => matchId(s.student_id, request.student_id) || matchId(s.id, request.student_id));
+
+      // Decrement available copies safely
+      book.available_copies = Math.max(0, Number(book.available_copies ?? book.available ?? 1) - 1);
+      book.available = book.available_copies;
+      book.borrow_count = (book.borrow_count || 0) + 1;
+
+      // Create issue transaction with DGI-ISS-xxxxxx
+      const issueId = generateId(state, 'issue');
+      const todayStr = new Date().toISOString().split('T')[0];
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 14);
+      const dueDateStr = dueDate.toISOString().split('T')[0];
+
+      const tx = {
+        id: issueId,
+        issue_id: issueId,
+        student_id: student ? (student.student_id || student.id) : request.student_id,
+        book_id: book.book_id || book.id,
+        book_title: book.title || book.book_name,
+        book_isbn: book.isbn,
+        issue_date: todayStr,
+        due_date: dueDateStr,
+        return_date: null,
+        fine: 0,
+        status: 'issued',
+        remarks: `Issued via approved request ${request.request_id || request.id}`
+      };
+      state.transactions.push(tx);
+
+      request.status = 'Approved';
+      request.approved_at = new Date().toISOString();
+      request.issue_id = issueId;
+
+      store.messages[account.key] = store.messages[account.key] || [];
+      store.messages[account.key].unshift({
+        id: 'MSG-' + Date.now(),
+        borrowerId: student ? student.id : request.student_id,
+        borrowerName: student ? student.name : request.student_name,
+        title: 'Book Request Approved',
+        body: `Your request for "${book.title}" was approved! Book ID: ${book.book_id}, Due Date: ${dueDateStr}. Ready for pickup at the central library desk.`,
+        date: new Date().toISOString(),
+        type: 'approval'
+      });
+
+      entry.revision += 1;
+      await saveStore();
+      return send(res, 200, { success: true, request, transaction: tx, book });
+    }
+
+    const rejectRequestMatch = p.match(/^\/api\/admin\/book-requests\/([a-zA-Z0-9_-]+)\/reject$/);
+    if (rejectRequestMatch && method === 'POST') {
+      const account = requireAdmin(req, res);
+      if (!account) return;
+      const reqId = rejectRequestMatch[1];
+      const b = await readBody(req);
+      const reason = String(b.reason || b.rejection_reason || 'Requested title cannot be fulfilled at this time.').trim();
+
+      const entry = accountState(account.key);
+      const state = entry.state || (entry.state = defaultLibraryState());
+      ensureDatabaseIntegrity(state);
+
+      const request = (state.book_requests || []).find(r => matchId(r.id, reqId) || matchId(r.request_id, reqId));
+      if (!request) return send(res, 404, { error: 'Book request not found.' });
+
+      request.status = 'Rejected';
+      request.rejected_at = new Date().toISOString();
+      request.rejection_reason = reason;
+
+      store.messages[account.key] = store.messages[account.key] || [];
+      store.messages[account.key].unshift({
+        id: 'MSG-' + Date.now(),
+        borrowerId: request.student_id,
+        borrowerName: request.student_name,
+        title: 'Book Request Declined',
+        body: `Your request for "${request.book_title}" could not be approved. Reason: ${reason}`,
+        date: new Date().toISOString(),
+        type: 'rejection'
+      });
+
+      entry.revision += 1;
+      await saveStore();
+      return send(res, 200, { success: true, request });
+    }
+
     // ============================ SUBJECTS API ==============================
     if (p === '/api/subjects' && method === 'GET') {
       const primaryKey = (store.accounts.find(a => a.isPrimary) || store.accounts[0] || {}).key || 'admin';
@@ -882,7 +1229,7 @@ async function handleRequest(req, res) {
       ensureDatabaseIntegrity(state);
 
       const subjects = (state.subjects || []).map(s => {
-        const bks = (state.books || []).filter(b => Number(b.subject_id) === Number(s.subject_id));
+        const bks = (state.books || []).filter(b => matchId(b.subject_id, s.subject_id));
         const totalBooks = bks.length;
         const totalCopies = bks.reduce((sum, b) => sum + Number(b.total_copies ?? b.quantity ?? 1), 0);
         const availableBooks = bks.reduce((sum, b) => sum + Math.max(0, Number(b.available_copies ?? b.available ?? b.total_copies ?? 1)), 0);
@@ -900,18 +1247,18 @@ async function handleRequest(req, res) {
       return send(res, 200, { subjects });
     }
 
-    const subjectDetailMatch = p.match(/^\/api\/subjects\/(\d+)\/books$/);
+    const subjectDetailMatch = p.match(/^\/api\/subjects\/([a-zA-Z0-9_-]+)\/books$/);
     if (subjectDetailMatch && method === 'GET') {
-      const subId = Number(subjectDetailMatch[1]);
+      const subId = subjectDetailMatch[1];
       const primaryKey = (store.accounts.find(a => a.isPrimary) || store.accounts[0] || {}).key || 'admin';
       const state = (store.states[primaryKey] || {}).state || defaultLibraryState();
       ensureDatabaseIntegrity(state);
 
-      const subject = (state.subjects || []).find(s => Number(s.subject_id) === subId);
+      const subject = (state.subjects || []).find(s => matchId(s.subject_id, subId));
       if (!subject) return send(res, 404, { error: 'Subject not found.' });
 
-      const books = (state.books || []).filter(b => Number(b.subject_id) === subId).map(b => ({
-        id: b.id,
+      const books = (state.books || []).filter(b => matchId(b.subject_id, subId)).map(b => ({
+        id: b.id || b.book_id,
         book_id: b.book_id || b.id,
         title: b.title || b.book_name,
         book_name: b.book_name || b.title,
@@ -951,11 +1298,11 @@ async function handleRequest(req, res) {
         return send(res, 409, { error: `A subject with name '${dup.subject_name}' or code '${dup.subject_code}' already exists.` });
       }
 
-      const nextId = state.subjects.reduce((max, s) => Math.max(max, Number(s.subject_id) || 0), 0) + 1;
+      const nextId = generateId(state, 'subject');
       const newSubject = {
         subject_id: nextId,
         subject_name: name,
-        subject_code: code,
+        subject_code: code || `SUB-${nextId.replace(/\D/g, '')}`,
         description: desc,
         icon: icon || '📖',
         created_at: new Date().toISOString()
@@ -966,11 +1313,11 @@ async function handleRequest(req, res) {
       return send(res, 201, { success: true, subject: newSubject, subjects: state.subjects });
     }
 
-    const adminSubjectMatch = p.match(/^\/api\/admin\/subjects\/(\d+)$/);
+    const adminSubjectMatch = p.match(/^\/api\/admin\/subjects\/([a-zA-Z0-9_-]+)$/);
     if (adminSubjectMatch && method === 'PUT') {
       const account = requireAdmin(req, res);
       if (!account) return;
-      const subId = Number(adminSubjectMatch[1]);
+      const subId = adminSubjectMatch[1];
       const b = await readBody(req);
       const name = String(b.subject_name || b.name || '').trim();
       const code = String(b.subject_code || b.code || '').trim();
@@ -983,10 +1330,10 @@ async function handleRequest(req, res) {
       const state = entry.state || (entry.state = defaultLibraryState());
       ensureDatabaseIntegrity(state);
 
-      const subject = state.subjects.find(s => Number(s.subject_id) === subId);
+      const subject = state.subjects.find(s => matchId(s.subject_id, subId));
       if (!subject) return send(res, 404, { error: 'Subject not found.' });
 
-      const dup = state.subjects.find(s => Number(s.subject_id) !== subId && (s.subject_name.toLowerCase() === name.toLowerCase() || (code && s.subject_code && s.subject_code.toLowerCase() === code.toLowerCase())));
+      const dup = state.subjects.find(s => !matchId(s.subject_id, subId) && (s.subject_name.toLowerCase() === name.toLowerCase() || (code && s.subject_code && s.subject_code.toLowerCase() === code.toLowerCase())));
       if (dup) {
         return send(res, 409, { error: 'Another subject with this name or code already exists.' });
       }
@@ -998,7 +1345,7 @@ async function handleRequest(req, res) {
       if (icon) subject.icon = icon;
 
       (state.books || []).forEach(bk => {
-        if (Number(bk.subject_id) === subId && (!bk.category || bk.category === oldName)) {
+        if (matchId(bk.subject_id, subId) && (!bk.category || bk.category === oldName)) {
           bk.category = name;
         }
       });
@@ -1011,18 +1358,18 @@ async function handleRequest(req, res) {
     if (adminSubjectMatch && method === 'DELETE') {
       const account = requireAdmin(req, res);
       if (!account) return;
-      const subId = Number(adminSubjectMatch[1]);
+      const subId = adminSubjectMatch[1];
       const b = await readBody(req);
-      const reassignId = b.reassign_to_subject_id ? Number(b.reassign_to_subject_id) : (url.searchParams.get('reassign_to') ? Number(url.searchParams.get('reassign_to')) : null);
+      const reassignId = b.reassign_to_subject_id || url.searchParams.get('reassign_to') || null;
 
       const entry = accountState(account.key);
       const state = entry.state || (entry.state = defaultLibraryState());
       ensureDatabaseIntegrity(state);
 
-      const subIdx = state.subjects.findIndex(s => Number(s.subject_id) === subId);
+      const subIdx = state.subjects.findIndex(s => matchId(s.subject_id, subId));
       if (subIdx === -1) return send(res, 404, { error: 'Subject not found.' });
 
-      const dependentBooks = (state.books || []).filter(bk => Number(bk.subject_id) === subId);
+      const dependentBooks = (state.books || []).filter(bk => matchId(bk.subject_id, subId));
       if (dependentBooks.length > 0) {
         if (!reassignId) {
           return send(res, 400, {
@@ -1030,12 +1377,12 @@ async function handleRequest(req, res) {
             dependentBooksCount: dependentBooks.length
           });
         }
-        const targetSub = state.subjects.find(s => Number(s.subject_id) === reassignId);
-        if (!targetSub || targetSub.subject_id === subId) {
+        const targetSub = state.subjects.find(s => matchId(s.subject_id, reassignId));
+        if (!targetSub || matchId(targetSub.subject_id, subId)) {
           return send(res, 400, { error: 'Invalid reassign target subject ID.' });
         }
         dependentBooks.forEach(bk => {
-          bk.subject_id = reassignId;
+          bk.subject_id = targetSub.subject_id;
           bk.category = targetSub.subject_name;
         });
       }
@@ -1103,7 +1450,7 @@ async function handleRequest(req, res) {
       return send(res, 200, { username: account.username, role: 'admin' }, undefined, { 'Set-Cookie': sessionCookieHeader(sid) });
     }
 
-    if (p === '/api/auth/login' && method === 'POST') {
+    if ((p === '/api/auth/login' || p === '/api/auth/student-login') && method === 'POST') {
       const b = await readBody(req);
       const input = String(b.username || b.roll_no || '').trim();
       const password = String(b.password || '');
@@ -1356,14 +1703,15 @@ async function handleRequest(req, res) {
         ensureDatabaseIntegrity(state);
         let sub = state.subjects.find(s =>
           s.subject_name.toLowerCase() === category.toLowerCase() ||
-          (s.subject_code && s.subject_code.toLowerCase() === category.toLowerCase())
+          (s.subject_code && s.subject_code.toLowerCase() === category.toLowerCase()) ||
+          matchId(s.subject_id, category)
         );
         if (!sub) {
-          const nextSubId = state.subjects.reduce((max, s) => Math.max(max, Number(s.subject_id) || 0), 0) + 1;
+          const nextSubId = generateId(state, 'subject');
           sub = {
             subject_id: nextSubId,
             subject_name: category,
-            subject_code: `SUB-${nextSubId}`,
+            subject_code: `SUB-${nextSubId.replace(/\D/g, '')}`,
             description: `Imported subject: ${category}`,
             icon: '📖',
             created_at: new Date().toISOString()
@@ -1371,7 +1719,7 @@ async function handleRequest(req, res) {
           state.subjects.push(sub);
         }
 
-        const bookId = nextId++;
+        const bookId = generateId(state, 'book');
         const newBook = {
           id: bookId,
           book_id: bookId,
@@ -1380,7 +1728,7 @@ async function handleRequest(req, res) {
           author: author || '',
           subject_id: sub.subject_id,
           category: sub.subject_name,
-          isbn: '978-DGI-' + String(bookId).padStart(4, '0'),
+          isbn: '978-DGI-' + String(bookId.replace(/\D/g, '')).padStart(4, '0'),
           publisher: 'DGI Academic Press',
           description: '',
           shelf_location: `Stack ${sub.subject_code || 'CS-101'}`,
@@ -1489,8 +1837,10 @@ async function handleRequest(req, res) {
         }
 
         const initials = name.split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'ST';
+        const studentId = generateId(state, 'student');
         const newStudent = {
-          id: nextId++,
+          id: studentId,
+          student_id: studentId,
           name,
           roll_no: roll,
           email: email || `${roll.toLowerCase()}@dronacharya.info`,
@@ -1593,9 +1943,10 @@ async function handleRequest(req, res) {
           continue;
         }
 
+        const facId = generateId(state, 'faculty');
         const newFaculty = {
-          id: nextId++,
-          faculty_id: facultyId || `FAC-${nextId}`,
+          id: facId,
+          faculty_id: facultyId || facId,
           name,
           designation: desig || 'Assistant Professor',
           department: dept || 'CSIT',
@@ -1731,18 +2082,18 @@ async function handleRequest(req, res) {
 
       state.books = Array.isArray(state.books) ? state.books : [];
 
-      let subjectId = Number(b.subject_id);
-      let subject = state.subjects.find(s => Number(s.subject_id) === subjectId);
+      let subjectId = b.subject_id;
+      let subject = state.subjects.find(s => matchId(s.subject_id, subjectId));
       if (!subject && b.category) {
         subject = state.subjects.find(s => s.subject_name.toLowerCase() === String(b.category).trim().toLowerCase());
         if (subject) subjectId = subject.subject_id;
       }
       if (!subject) {
         subject = state.subjects[0];
-        subjectId = subject ? subject.subject_id : 1;
+        subjectId = subject ? subject.subject_id : "SUB-0001";
       }
 
-      let nextId = state.books.reduce((max, bk) => Math.max(max, Number(bk.id) || Number(bk.book_id) || 0), 0) + 1;
+      const nextId = generateId(state, 'book');
       const qty = Math.max(1, parseInt(b.quantity || b.total_copies, 10) || 1);
       const newBook = {
         id: nextId,
@@ -1752,7 +2103,7 @@ async function handleRequest(req, res) {
         author: author || 'Unknown Author',
         category: subject ? subject.subject_name : (b.category || 'General'),
         subject_id: subjectId,
-        isbn: String(b.isbn || '').trim() || ('978-DGI-' + String(nextId).padStart(4, '0')),
+        isbn: String(b.isbn || '').trim() || ('978-DGI-' + String(nextId.replace(/\D/g, '')).padStart(4, '0')),
         publisher: String(b.publisher || '').trim() || 'DGI Academic Press',
         description: String(b.description || '').trim(),
         shelf_location: String(b.shelf_location || '').trim() || `Stack ${subject?.subject_code || 'CS-101'}`,
@@ -1774,17 +2125,17 @@ async function handleRequest(req, res) {
       return send(res, 201, { success: true, book: newBook, books: state.books });
     }
 
-    const adminBookMatch = p.match(/^\/api\/admin\/books\/(\d+)$/);
+    const adminBookMatch = p.match(/^\/api\/admin\/books\/([a-zA-Z0-9_-]+)$/);
     if (adminBookMatch && method === 'PUT') {
       const account = requireAdmin(req, res);
       if (!account) return;
-      const bookId = Number(adminBookMatch[1]);
+      const bookId = adminBookMatch[1];
       const b = await readBody(req);
       const entry = accountState(account.key);
       const state = entry.state || (entry.state = defaultLibraryState());
       ensureDatabaseIntegrity(state);
 
-      const book = state.books.find(bk => Number(bk.id) === bookId || Number(bk.book_id) === bookId);
+      const book = state.books.find(bk => matchId(bk.id, bookId) || matchId(bk.book_id, bookId));
       if (!book) return send(res, 404, { error: 'Book not found.' });
 
       if (b.title || b.book_name) {
@@ -1793,10 +2144,9 @@ async function handleRequest(req, res) {
       }
       if (b.author !== undefined) book.author = String(b.author).trim();
       if (b.subject_id !== undefined) {
-        const subId = Number(b.subject_id);
-        const sub = state.subjects.find(s => Number(s.subject_id) === subId);
+        const sub = state.subjects.find(s => matchId(s.subject_id, b.subject_id));
         if (sub) {
-          book.subject_id = subId;
+          book.subject_id = sub.subject_id;
           book.category = sub.subject_name;
         }
       } else if (b.category !== undefined) {
@@ -1829,17 +2179,17 @@ async function handleRequest(req, res) {
     if (adminBookMatch && method === 'DELETE') {
       const account = requireAdmin(req, res);
       if (!account) return;
-      const bookId = Number(adminBookMatch[1]);
+      const bookId = adminBookMatch[1];
       const entry = accountState(account.key);
       const state = entry.state || (entry.state = defaultLibraryState());
       ensureDatabaseIntegrity(state);
 
-      const isIssued = (state.transactions || []).some(t => Number(t.book_id) === bookId && t.status === 'issued');
+      const isIssued = (state.transactions || []).some(t => matchId(t.book_id, bookId) && t.status === 'issued');
       if (isIssued) {
         return send(res, 400, { error: 'Cannot delete a book that is currently issued to students or faculty.' });
       }
 
-      const idx = state.books.findIndex(bk => Number(bk.id) === bookId || Number(bk.book_id) === bookId);
+      const idx = state.books.findIndex(bk => matchId(bk.id, bookId) || matchId(bk.book_id, bookId));
       if (idx === -1) return send(res, 404, { error: 'Book not found.' });
 
       state.books.splice(idx, 1);

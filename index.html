@@ -104,6 +104,11 @@
           <span class="nav-icon">📥</span>
           <span class="nav-text">Return Desk</span>
         </div>
+        <div class="nav-item" data-view="book-requests">
+          <span class="nav-icon">📑</span>
+          <span class="nav-text">Book Requests</span>
+          <span class="nav-badge" id="nav-book-requests-badge" style="display: none;">0</span>
+        </div>
         <div class="nav-item" data-view="alerts">
           <span class="nav-icon">🔔</span>
           <span class="nav-text">Deadline Alerts</span>
@@ -400,6 +405,52 @@
             </div>
           </div>
 
+          <!-- Top KPI Statistics Cards (Actual Database Records) -->
+          <div class="stat-card-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px;">
+            <div class="stat-card">
+              <div class="stat-icon-wrapper" style="background: rgba(81, 0, 39, 0.15); color: var(--accent-primary);">📚</div>
+              <div class="stat-info">
+                <div class="stat-value" id="kpi-catalog-total-books">0</div>
+                <div class="stat-label">Total Books</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon-wrapper" style="background: rgba(59, 130, 246, 0.15); color: #3b82f6;">📦</div>
+              <div class="stat-info">
+                <div class="stat-value" id="kpi-catalog-total-copies">0</div>
+                <div class="stat-label">Total Copies</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon-wrapper" style="background: rgba(16, 185, 129, 0.15); color: var(--success);">✅</div>
+              <div class="stat-info">
+                <div class="stat-value" id="kpi-catalog-available-copies">0</div>
+                <div class="stat-label">Available Copies</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon-wrapper" style="background: rgba(245, 158, 11, 0.15); color: var(--warning);">🔄</div>
+              <div class="stat-info">
+                <div class="stat-value" id="kpi-catalog-issued-copies">0</div>
+                <div class="stat-label">Issued Copies</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon-wrapper" style="background: rgba(239, 68, 68, 0.15); color: var(--danger);">⚠️</div>
+              <div class="stat-info">
+                <div class="stat-value" id="kpi-catalog-out-of-stock" style="color:var(--danger);">0</div>
+                <div class="stat-label">Out of Stock</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon-wrapper" style="background: rgba(139, 92, 246, 0.15); color: #8b5cf6;">🗂️</div>
+              <div class="stat-info">
+                <div class="stat-value" id="kpi-catalog-total-subjects">0</div>
+                <div class="stat-label">Total Subjects</div>
+              </div>
+            </div>
+          </div>
+
           <!-- Catalog Mode Switch Tabs -->
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom: 20px;">
             <div class="tab-mode-toggle" style="display:inline-flex; background:rgba(0,0,0,0.25); padding:4px; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
@@ -512,15 +563,15 @@
             </div>
           </div>
 
-          <!-- SUB-VIEW C: ALL BOOKS TRADITIONAL TABLE VIEW -->
+          <!-- SUB-VIEW C: ALL BOOKS MODERN CATALOG & TABLE VIEW -->
           <div id="catalog-all-books-container" style="display:none;">
             <!-- Filter Controls -->
             <div class="table-wrapper" style="margin-bottom: 20px;">
               <div class="table-filter-bar">
-                <div class="filter-left">
-                  <div class="search-input-box">
+                <div class="filter-left" style="display:flex; gap:10px; flex-wrap:wrap; flex:1;">
+                  <div class="search-input-box" style="flex:1; min-width:240px;">
                     <span class="search-icon">🔍</span>
-                    <input type="text" id="books-search-input" placeholder="Search by title, author, publication, ISBN...">
+                    <input type="text" id="books-search-input" placeholder="Search by book name, author, book ID (DGI-BK-...), or ISBN...">
                   </div>
 
                   <select class="select-filter" id="books-subject-filter-select">
@@ -531,14 +582,18 @@
                     <option value="all">All Categories</option>
                   </select>
 
-                  <select class="select-filter" id="books-branch-select" aria-label="Filter books by branch">
-                    <option value="all">All Branches</option>
-                  </select>
-
                   <select class="select-filter" id="books-avail-select">
                     <option value="all">All Availability</option>
                     <option value="available">Available Now</option>
-                    <option value="out_of_stock">Checked Out (0 Avail)</option>
+                    <option value="out_of_stock">Out of Stock</option>
+                  </select>
+
+                  <select class="select-filter" id="books-sort-select" onchange="window.app.renderBooks()">
+                    <option value="name_asc">Sort: Book Name (A-Z)</option>
+                    <option value="name_desc">Sort: Book Name (Z-A)</option>
+                    <option value="recent">Sort: Recently Added</option>
+                    <option value="copies_desc">Sort: Copies (High to Low)</option>
+                    <option value="avail_desc">Sort: Available Copies</option>
                   </select>
                 </div>
               </div>
@@ -551,17 +606,84 @@
               <table class="data-table">
                 <thead>
                   <tr>
-                    <th>Book Details</th>
-                    <th>Subject</th>
+                    <th style="width:120px;">Book ID</th>
+                    <th style="width:60px;">Cover</th>
+                    <th>Book Name</th>
                     <th>Author</th>
-                    <th>Branch</th>
-                    <th>ISBN / Accession</th>
-                    <th>Copies (Avail/Total)</th>
+                    <th>Subject</th>
+                    <th>Category</th>
+                    <th>ISBN</th>
+                    <th style="text-align:center;">Total</th>
+                    <th style="text-align:center;">Avail</th>
                     <th>Status</th>
-                    <th>Actions</th>
+                    <th style="text-align:right;">Actions</th>
                   </tr>
                 </thead>
                 <tbody id="books-table-tbody"></tbody>
+              </table>
+
+              <!-- Pagination Bar -->
+              <div class="pagination-bar" id="books-pagination-bar" style="display:flex; justify-content:space-between; align-items:center; padding:14px 20px; border-top:1px solid var(--border-color); flex-wrap:wrap; gap:12px;">
+                <div style="font-size:13px; color:var(--text-secondary);" id="books-pagination-info">Showing 1 to 10 of 23 books</div>
+                <div style="display:flex; gap:6px; align-items:center;" id="books-pagination-controls">
+                  <!-- Rendered via JS -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- ==================================================================
+             VIEW: ADMIN STUDENT BOOK REQUESTS MANAGEMENT
+             ================================================================== -->
+        <section class="page-view" id="view-book-requests" style="display:none;">
+          <div class="page-header">
+            <div class="page-title-group">
+              <h1>Student Book Requests</h1>
+              <p>Review, approve, and fulfill student library book reservation requests.</p>
+            </div>
+            <div class="page-actions">
+              <button class="btn btn-secondary btn-sm" onclick="window.app.loadAdminBookRequests()">🔄 Refresh Requests</button>
+            </div>
+          </div>
+
+          <div class="table-wrapper" style="margin-bottom: 20px;">
+            <div class="table-filter-bar">
+              <div class="filter-left" style="display:flex; gap:10px; flex-wrap:wrap; flex:1;">
+                <div class="search-input-box" style="flex:1; min-width:240px;">
+                  <span class="search-icon">🔍</span>
+                  <input type="text" id="admin-requests-search" placeholder="Search by student name, roll number, book title, or request ID..." oninput="window.app.renderAdminBookRequests()">
+                </div>
+                <select class="select-filter" id="admin-requests-status-filter" onchange="window.app.renderAdminBookRequests()">
+                  <option value="all">All Request Statuses</option>
+                  <option value="Pending" selected>Pending Review</option>
+                  <option value="Approved">Approved - Fulfilled</option>
+                  <option value="Rejected">Rejected</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="padding: 20px;">
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Request ID</th>
+                    <th>Student Name &amp; Roll</th>
+                    <th>Book Title &amp; ID</th>
+                    <th>ISBN</th>
+                    <th>In Stock</th>
+                    <th>Requested On</th>
+                    <th>Notes</th>
+                    <th>Status</th>
+                    <th style="text-align:right;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-book-requests-tbody">
+                  <!-- Rendered via JS -->
+                </tbody>
               </table>
             </div>
           </div>
@@ -1907,6 +2029,22 @@
       <div style="display: flex; justify-content: center; gap: 10px; margin-top: 16px;">
         <button class="btn btn-secondary btn-sm" onclick="window.app.closeModal('modal-return-slip')">Close</button>
         <button class="btn btn-primary btn-sm" onclick="window.app.printCurrentSlip()">🖨️ Print Certificate</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Admin Book Details -->
+  <div class="modal-backdrop" id="modal-admin-book-details">
+    <div class="modal-box" style="max-width: 600px;">
+      <div class="modal-header">
+        <div class="modal-title" id="admin-book-detail-title">Book Details</div>
+        <button class="modal-close-btn" onclick="window.app.closeModal('modal-admin-book-details')">&times;</button>
+      </div>
+      <div class="modal-body" id="admin-book-detail-body">
+        <!-- Rendered via JS -->
+      </div>
+      <div class="modal-footer" id="admin-book-detail-footer" style="display:flex; justify-content:flex-end; gap:8px;">
+        <!-- Action buttons -->
       </div>
     </div>
   </div>

@@ -41,6 +41,18 @@ class StudentPortal {
     return /^#[\da-f]{3,8}$/i.test(color) && [4, 5, 7, 9].includes(color.length) ? color : "#510027";
   }
 
+  matchId(a, b) {
+    if (a == null || b == null) return false;
+    if (window.db?.matchId) return window.db.matchId(a, b);
+    const sa = String(a).trim().toLowerCase();
+    const sb = String(b).trim().toLowerCase();
+    if (sa === sb) return true;
+    const numA = sa.replace(/^[a-z_-]+/i, "");
+    const numB = sb.replace(/^[a-z_-]+/i, "");
+    if (numA && numB && parseInt(numA, 10) === parseInt(numB, 10)) return true;
+    return false;
+  }
+
   // --- Themes & Display Settings ---
   setupTheme() {
     const savedAccent = localStorage.getItem("dgi_accent") || "dronacharya";
@@ -195,30 +207,41 @@ class StudentPortal {
     const sidebar = document.getElementById("sidebar");
     if (sidebar) sidebar.classList.remove("mobile-open");
 
-    const target = document.getElementById(`view-${viewName}`);
-    if (target) {
-      target.style.display = "block";
-      target.classList.add("active");
-    }
-
     const navItem = document.querySelector(`.sidebar-nav .nav-item[data-view="${viewName}"]`);
     if (navItem) navItem.classList.add("active");
 
-    if (viewName === "browse") {
-      this.setBrowseMode(this.browseMode);
+    if (viewName === "dashboard") {
+      const target = document.getElementById("view-dashboard");
+      if (target) { target.style.display = "block"; target.classList.add("active"); }
+      this.renderDashboard();
+    } else if (viewName === "browse") {
+      const target = document.getElementById("view-browse");
+      if (target) { target.style.display = "block"; target.classList.add("active"); }
+      this.setBrowseMode("all");
     } else if (viewName === "subjects") {
-      this.switchView("browse");
+      const target = document.getElementById("view-browse");
+      if (target) { target.style.display = "block"; target.classList.add("active"); }
       this.setBrowseMode("subjects");
       this.backToSubjects();
     } else if (viewName === "issued") {
+      const target = document.getElementById("view-issued");
+      if (target) { target.style.display = "block"; target.classList.add("active"); }
       this.renderIssuedBooks();
     } else if (viewName === "returns") {
+      const target = document.getElementById("view-returns");
+      if (target) { target.style.display = "block"; target.classList.add("active"); }
       this.renderReturnHistory();
     } else if (viewName === "requests") {
+      const target = document.getElementById("view-requests");
+      if (target) { target.style.display = "block"; target.classList.add("active"); }
       this.renderBookRequests();
     } else if (viewName === "notifications") {
+      const target = document.getElementById("view-notifications");
+      if (target) { target.style.display = "block"; target.classList.add("active"); }
       this.renderNotifications();
     } else if (viewName === "profile") {
+      const target = document.getElementById("view-profile");
+      if (target) { target.style.display = "block"; target.classList.add("active"); }
       this.renderProfile();
     }
   }
@@ -280,8 +303,8 @@ class StudentPortal {
     if (!container) return;
     const showcase = this.subjects.slice(0, 6);
     container.innerHTML = showcase.map(s => `
-      <div class="card subject-card-hover" style="padding:16px; display:flex; align-items:center; gap:14px; background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-md);"
-           onclick="window.studentPortal.switchView('browse'); window.studentPortal.openSubjectDetail(${s.subject_id})">
+      <div class="card subject-card-hover" style="padding:16px; display:flex; align-items:center; gap:14px; background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-md); cursor:pointer;"
+           onclick="window.studentPortal.switchView('browse'); window.studentPortal.openSubjectDetail('${this.escapeHTML(s.subject_id)}')">
         <div style="font-size:28px; width:48px; height:48px; border-radius:12px; background:rgba(81,0,39,0.15); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
           ${s.icon || "📚"}
         </div>
@@ -354,14 +377,14 @@ class StudentPortal {
     }
 
     grid.innerHTML = filtered.map(s => {
-      const booksInSub = this.allBooks.filter(b => Number(b.subject_id) === Number(s.subject_id));
+      const booksInSub = this.allBooks.filter(b => this.matchId(b.subject_id, s.subject_id));
       const totalTitles = booksInSub.length;
       const availCopies = booksInSub.reduce((acc, b) => acc + Number(b.available_copies ?? b.available ?? 0), 0);
       const totalCopies = booksInSub.reduce((acc, b) => acc + Number(b.total_copies ?? b.quantity ?? 0), 0);
 
       return `
-        <div class="card subject-card-hover" style="border-radius:var(--radius-md); padding:20px; display:flex; flex-direction:column; justify-content:space-between; background:var(--bg-card); border:1px solid var(--border-color);"
-             onclick="window.studentPortal.openSubjectDetail(${s.subject_id})">
+        <div class="card subject-card-hover" style="border-radius:var(--radius-md); padding:20px; display:flex; flex-direction:column; justify-content:space-between; background:var(--bg-card); border:1px solid var(--border-color); cursor:pointer;"
+             onclick="window.studentPortal.openSubjectDetail('${this.escapeHTML(s.subject_id)}')">
           <div>
             <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
               <div style="font-size:32px; width:52px; height:52px; border-radius:12px; background:rgba(81,0,39,0.15); display:flex; align-items:center; justify-content:center; border:1px solid var(--border-color);">
@@ -400,11 +423,10 @@ class StudentPortal {
   }
 
   openSubjectDetail(subjectId) {
-    const subId = Number(subjectId);
-    const subject = this.subjects.find(s => Number(s.subject_id) === subId);
+    const subject = this.subjects.find(s => this.matchId(s.subject_id, subjectId));
     if (!subject) return;
 
-    this.activeSubjectId = subId;
+    this.activeSubjectId = subject.subject_id;
     this.browseMode = "subjects";
 
     const subjectsCont = document.getElementById("student-subjects-container");
@@ -429,7 +451,7 @@ class StudentPortal {
     if (iconEl) iconEl.textContent = subject.icon || "📚";
 
     // Populate author dropdown for this subject
-    const books = this.allBooks.filter(b => Number(b.subject_id) === subId);
+    const books = this.allBooks.filter(b => this.matchId(b.subject_id, subject.subject_id));
     const authorSelect = document.getElementById("student-subject-author-select");
     if (authorSelect) {
       const authors = [...new Set(books.map(b => (b.author || "").trim()).filter(Boolean))].sort();
@@ -462,8 +484,7 @@ class StudentPortal {
     const grid = document.getElementById("student-subject-books-grid");
     if (!grid) return;
 
-    const subId = Number(this.activeSubjectId);
-    let books = this.allBooks.filter(b => Number(b.subject_id) === subId);
+    let books = this.allBooks.filter(b => this.matchId(b.subject_id, this.activeSubjectId));
 
     const searchVal = (document.getElementById("student-subject-book-search")?.value || "").toLowerCase().trim();
     const authorVal = document.getElementById("student-subject-author-select")?.value || "all";
@@ -475,7 +496,8 @@ class StudentPortal {
         String(b.book_name || b.title || "").toLowerCase().includes(searchVal) ||
         String(b.author || "").toLowerCase().includes(searchVal) ||
         String(b.publisher || "").toLowerCase().includes(searchVal) ||
-        String(b.isbn || "").toLowerCase().includes(searchVal)
+        String(b.isbn || "").toLowerCase().includes(searchVal) ||
+        String(b.book_id || b.id || "").toLowerCase().includes(searchVal)
       );
     }
 
@@ -484,9 +506,9 @@ class StudentPortal {
     }
 
     if (availVal === "available") {
-      books = books.filter(b => (b.available_copies ?? b.available ?? 0) > 0);
+      books = books.filter(b => Number(b.available_copies ?? b.available ?? 0) > 0);
     } else if (availVal === "out_of_stock") {
-      books = books.filter(b => (b.available_copies ?? b.available ?? 0) === 0);
+      books = books.filter(b => Number(b.available_copies ?? b.available ?? 0) === 0);
     }
 
     books.sort((a, b) => {
@@ -523,6 +545,9 @@ class StudentPortal {
                 📖
               </div>
               <div style="overflow:hidden;">
+                <div style="display:flex; align-items:center; gap:6px; margin-bottom:3px;">
+                  <code style="font-size:11px; font-weight:700; color:var(--accent-primary);">${this.escapeHTML(bookId)}</code>
+                </div>
                 <div style="font-size:15px; font-weight:800; color:var(--text-primary); margin-bottom:4px; line-height:1.3;">${this.escapeHTML(title)}</div>
                 <div style="font-size:12px; color:var(--text-secondary);">By <strong>${this.escapeHTML(b.author || "Unknown")}</strong></div>
                 ${year ? `<div style="font-size:11px; color:var(--text-muted);">Year: ${this.escapeHTML(year)}</div>` : ""}
@@ -543,10 +568,10 @@ class StudentPortal {
           </div>
 
           <div style="display:flex; gap:8px;">
-            <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="window.studentPortal.openBookModal(${bookId})">
+            <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="window.studentPortal.openBookModal('${this.escapeHTML(bookId)}')">
               Details
             </button>
-            <button class="btn btn-primary btn-sm" style="flex:1;" onclick="window.studentPortal.quickRequestBook(${bookId})">
+            <button class="btn btn-primary btn-sm" style="flex:1;" onclick="window.studentPortal.quickRequestBook('${this.escapeHTML(bookId)}')">
               ${available > 0 ? "Request" : "Reserve"}
             </button>
           </div>
@@ -576,18 +601,19 @@ class StudentPortal {
       books = books.filter(b =>
         String(b.book_name || b.title || "").toLowerCase().includes(search) ||
         String(b.author || "").toLowerCase().includes(search) ||
+        String(b.book_id || b.id || "").toLowerCase().includes(search) ||
         String(b.isbn || "").toLowerCase().includes(search)
       );
     }
 
     if (subVal !== "all") {
-      books = books.filter(b => Number(b.subject_id) === Number(subVal));
+      books = books.filter(b => this.matchId(b.subject_id, subVal));
     }
 
     if (availVal === "available") {
-      books = books.filter(b => (b.available_copies ?? b.available ?? 0) > 0);
+      books = books.filter(b => Number(b.available_copies ?? b.available ?? 0) > 0);
     } else if (availVal === "out_of_stock") {
-      books = books.filter(b => (b.available_copies ?? b.available ?? 0) === 0);
+      books = books.filter(b => Number(b.available_copies ?? b.available ?? 0) === 0);
     }
 
     if (books.length === 0) {
@@ -595,12 +621,10 @@ class StudentPortal {
       return;
     }
 
-    const subMap = new Map(this.subjects.map(s => [Number(s.subject_id), s]));
-
     tbody.innerHTML = books.map(b => {
       const bookId = b.book_id || b.id;
       const title = b.book_name || b.title || "Untitled";
-      const sub = subMap.get(Number(b.subject_id));
+      const sub = this.subjects.find(s => this.matchId(s.subject_id, b.subject_id));
       const subName = sub ? sub.subject_name : (b.category || "General");
       const available = Number(b.available_copies ?? b.available ?? 0);
       const total = Number(b.total_copies ?? b.quantity ?? 0);
@@ -608,7 +632,10 @@ class StudentPortal {
       return `
         <tr>
           <td>
-            <div style="font-weight:700; color:var(--text-primary);">${this.escapeHTML(title)}</div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <code style="font-size:11px; font-weight:700; color:var(--accent-primary);">${this.escapeHTML(bookId)}</code>
+            </div>
+            <div style="font-weight:700; color:var(--text-primary); margin-top:2px;">${this.escapeHTML(title)}</div>
             <div style="font-size:11px; color:var(--text-muted);">${b.publisher ? `Publisher: ${this.escapeHTML(b.publisher)}` : ""}</div>
           </td>
           <td><span class="badge badge-accent">${this.escapeHTML(subName)}</span></td>
@@ -621,7 +648,7 @@ class StudentPortal {
               : `<span class="badge badge-danger">Out of Stock</span>`}
           </td>
           <td>
-            <button class="btn btn-primary btn-sm" onclick="window.studentPortal.openBookModal(${bookId})">View & Request</button>
+            <button class="btn btn-primary btn-sm" onclick="window.studentPortal.openBookModal('${this.escapeHTML(bookId)}')">View & Request</button>
           </td>
         </tr>
       `;
@@ -630,12 +657,11 @@ class StudentPortal {
 
   // --- Modal: Book Details & Request ---
   openBookModal(bookId) {
-    const id = Number(bookId);
-    const book = this.allBooks.find(b => Number(b.book_id || b.id) === id);
+    const book = this.allBooks.find(b => this.matchId(b.book_id || b.id, bookId));
     if (!book) return;
 
-    this.modalBookId = id;
-    const subject = this.subjects.find(s => Number(s.subject_id) === Number(book.subject_id));
+    this.modalBookId = book.book_id || book.id;
+    const subject = this.subjects.find(s => this.matchId(s.subject_id, book.subject_id));
     const title = book.book_name || book.title || "Untitled Book";
     const available = Number(book.available_copies ?? book.available ?? 0);
     const total = Number(book.total_copies ?? book.quantity ?? 0);
@@ -685,7 +711,7 @@ class StudentPortal {
   }
 
   async quickRequestBook(bookId) {
-    this.modalBookId = Number(bookId);
+    this.modalBookId = bookId;
     await this.requestCurrentModalBook();
   }
 
@@ -700,19 +726,24 @@ class StudentPortal {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        this.showToast("Request Placed", "Your book request was registered. Library staff will review it.", "success");
+        this.showToast("Request Placed", `Your book request (${data.request_id || "created"}) was registered. Library staff will review it.`, "success");
         this.closeModal("modal-book-details");
-        // Reload requests
-        const reqsRes = await fetch("/api/student/book-requests", { credentials: "same-origin" }).then(r => r.json());
-        this.requests = reqsRes?.requests || [];
-        this.renderBookRequests();
-        this.updateBadges();
+        await this.reloadBookRequests();
       } else {
-        throw new Error(data.error || "Failed to submit request.");
+        this.showToast("Request Failed", data.error || "Failed to submit request.", "danger");
       }
     } catch (err) {
       this.showToast("Request Failed", err.message, "danger");
     }
+  }
+
+  async reloadBookRequests() {
+    try {
+      const reqsRes = await fetch("/api/student/book-requests", { credentials: "same-origin" }).then(r => r.json());
+      this.requests = reqsRes?.requests || [];
+      this.renderBookRequests();
+      this.updateBadges();
+    } catch (_) {}
   }
 
   // --- View 4: My Issued Books ---
@@ -740,18 +771,22 @@ class StudentPortal {
         ? `<span class="badge badge-danger">₹${fine} Due</span>`
         : `<span class="badge badge-success">₹0 Clean</span>`;
 
+      const bookId = loan.book_id || "";
+
       return `
         <tr>
           <td>
             <div style="font-weight:700; color:var(--text-primary);">${this.escapeHTML(loan.book_title || "Untitled")}</div>
-            <div style="font-size:11px; color:var(--text-muted);">By ${this.escapeHTML(loan.author || "—")} | ISBN: ${this.escapeHTML(loan.isbn || "—")}</div>
+            <div style="font-size:11px; color:var(--text-muted);">
+              ${bookId ? `<code>${this.escapeHTML(bookId)}</code> &bull; ` : ""}By ${this.escapeHTML(loan.author || "—")} | ISBN: ${this.escapeHTML(loan.isbn || "—")}
+            </div>
           </td>
           <td>${this.escapeHTML(loan.issue_date || "—")}</td>
           <td><strong>${this.escapeHTML(loan.due_date || "—")}</strong></td>
           <td>${daysPill}</td>
           <td>${fineBadge}</td>
           <td>
-            <button class="btn btn-secondary btn-sm" onclick="window.studentPortal.openBookModal(${loan.book_id})">Book Info</button>
+            <button class="btn btn-secondary btn-sm" onclick="window.studentPortal.openBookModal('${this.escapeHTML(bookId)}')">Book Info</button>
           </td>
         </tr>
       `;
@@ -806,18 +841,20 @@ class StudentPortal {
           ? `<span class="badge badge-success">Approved / Ready</span>`
           : `<span class="badge badge-danger">${this.escapeHTML(req.status)}</span>`);
 
+      const reqKey = req.request_id || req.id;
+
       return `
         <tr>
           <td>
             <div style="font-weight:700; color:var(--text-primary);">${this.escapeHTML(req.book_title || "Untitled Book")}</div>
-            <div style="font-size:11px; color:var(--text-muted);">Req ID: #${req.id}</div>
+            <div style="font-size:11px; color:var(--text-muted);">Req ID: <code>${this.escapeHTML(reqKey)}</code></div>
           </td>
           <td>${this.escapeHTML(req.subject_name || "General")}</td>
           <td>${this.escapeHTML(req.request_date || "—")}</td>
           <td><span style="font-size:12px; color:var(--text-secondary);">${this.escapeHTML(req.notes || "None")}</span></td>
           <td>${statusBadge}</td>
           <td>
-            ${isPending ? `<button class="btn btn-danger btn-sm" onclick="window.studentPortal.cancelRequest(${req.id})">Cancel</button>` : "—"}
+            ${isPending ? `<button class="btn btn-danger btn-sm" onclick="window.studentPortal.cancelRequest('${this.escapeHTML(reqKey)}')">Cancel</button>` : "—"}
           </td>
         </tr>
       `;
@@ -852,18 +889,16 @@ class StudentPortal {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ book_id: Number(bookId), notes: notes })
+        body: JSON.stringify({ book_id: bookId, notes: notes })
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        this.showToast("Request Submitted", "Your request has been placed into the review queue.", "success");
+        this.showToast("Request Submitted", `Your request (${data.request_id || "created"}) has been placed into the review queue.`, "success");
         this.closeModal("modal-make-request");
-        const reqsRes = await fetch("/api/student/book-requests", { credentials: "same-origin" }).then(r => r.json());
-        this.requests = reqsRes?.requests || [];
-        this.renderBookRequests();
-        this.updateBadges();
+        document.getElementById("form-book-request")?.reset();
+        await this.reloadBookRequests();
       } else {
-        throw new Error(data.error || "Request submission failed.");
+        this.showToast("Request Failed", data.error || "Request submission failed.", "danger");
       }
     } catch (err) {
       this.showToast("Error", err.message, "danger");
@@ -871,20 +906,18 @@ class StudentPortal {
   }
 
   async cancelRequest(requestId) {
-    if (!confirm("Are you sure you want to cancel this book request?")) return;
+    if (!confirm(`Are you sure you want to cancel book request '${requestId}'?`)) return;
     try {
-      const res = await fetch(`/api/student/book-requests/${requestId}`, {
+      const res = await fetch(`/api/student/book-requests/${encodeURIComponent(requestId)}`, {
         method: "DELETE",
         credentials: "same-origin"
       });
       const data = await res.json();
       if (res.ok && data.success) {
         this.showToast("Cancelled", "Book request was cancelled.", "info");
-        this.requests = this.requests.filter(r => r.id !== requestId);
-        this.renderBookRequests();
-        this.updateBadges();
+        await this.reloadBookRequests();
       } else {
-        throw new Error(data.error || "Failed to cancel request.");
+        this.showToast("Cancellation Failed", data.error || "Failed to cancel request.", "danger");
       }
     } catch (err) {
       this.showToast("Error", err.message, "danger");
